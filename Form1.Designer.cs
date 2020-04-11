@@ -32,7 +32,7 @@
             this.btnStopStart = new System.Windows.Forms.Button();
             this.lblPipeName = new System.Windows.Forms.Label();
             this.lblFolder = new System.Windows.Forms.Label();
-            this.textPipeName = new System.Windows.Forms.TextBox();
+            this.txtPipeName = new System.Windows.Forms.TextBox();
             this.txtFolder = new System.Windows.Forms.TextBox();
             this.btnSelectFolder = new System.Windows.Forms.Button();
             this.lblConnected = new System.Windows.Forms.Label();
@@ -55,7 +55,7 @@
             this.tableLayoutPanel1.Controls.Add(this.btnStopStart, 2, 2);
             this.tableLayoutPanel1.Controls.Add(this.lblPipeName, 0, 0);
             this.tableLayoutPanel1.Controls.Add(this.lblFolder, 0, 1);
-            this.tableLayoutPanel1.Controls.Add(this.textPipeName, 1, 0);
+            this.tableLayoutPanel1.Controls.Add(this.txtPipeName, 1, 0);
             this.tableLayoutPanel1.Controls.Add(this.txtFolder, 1, 1);
             this.tableLayoutPanel1.Controls.Add(this.btnSelectFolder, 2, 1);
             this.tableLayoutPanel1.Controls.Add(this.lblConnected, 0, 4);
@@ -115,17 +115,17 @@
             this.lblFolder.TabIndex = 1;
             this.lblFolder.Text = "Folder name:";
             // 
-            // textPipeName
+            // txtPipeName
             // 
-            this.textPipeName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
+            this.txtPipeName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.textPipeName.Enabled = false;
-            this.textPipeName.Location = new System.Drawing.Point(84, 35);
-            this.textPipeName.MinimumSize = new System.Drawing.Size(100, 4);
-            this.textPipeName.Name = "textPipeName";
-            this.textPipeName.Size = new System.Drawing.Size(492, 20);
-            this.textPipeName.TabIndex = 2;
-            this.textPipeName.Text = "RTSS_Frametime";
+            this.txtPipeName.Enabled = false;
+            this.txtPipeName.Location = new System.Drawing.Point(84, 35);
+            this.txtPipeName.MinimumSize = new System.Drawing.Size(100, 4);
+            this.txtPipeName.Name = "txtPipeName";
+            this.txtPipeName.Size = new System.Drawing.Size(492, 20);
+            this.txtPipeName.TabIndex = 2;
+            this.txtPipeName.Text = "RTSS_Frametime";
             // 
             // txtFolder
             // 
@@ -267,7 +267,7 @@
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.Label lblPipeName;
         private System.Windows.Forms.Label lblFolder;
-        private System.Windows.Forms.TextBox textPipeName;
+        private System.Windows.Forms.TextBox txtPipeName;
         private System.Windows.Forms.TextBox txtFolder;
         private System.Windows.Forms.Button btnSelectFolder;
         private System.Windows.Forms.Button btnStopStart;

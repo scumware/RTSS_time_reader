@@ -105,8 +105,8 @@ namespace RTSS_time_reader
 
 
             btnStopStart.Enabled = true;
-            btnSelectFolder.Enabled =
-            btnSelectFolder.Enabled = (false == m_pipeReader.IsStarted);
+
+            txtPipeName.Enabled = (false == m_pipeReader.IsStarted);
 
             if (m_pipeReader.IsStarted)
             {
@@ -155,7 +155,7 @@ namespace RTSS_time_reader
         private void StartListening()
         {
             m_pipeReader.FileName = FileFullName();
-            m_pipeReader.PipeName = textPipeName.Text;
+            m_pipeReader.PipeName = txtPipeName.Text;
             m_pipeReader.WriteFrapsFileFormat = chkFrapsFormat.Checked;
             m_pipeReader.StartAcceptingConnections();
         }

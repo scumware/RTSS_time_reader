@@ -47,7 +47,8 @@ namespace RTSS_time_reader
         {
             return (m_state & p_flag) != 0;
         }
-        public void SetFlag(PipeReaderState p_flag, bool p_value)
+
+        protected void SetFlag(PipeReaderState p_flag, bool p_value)
         {
             if (p_value)
                 m_state |= p_flag;
@@ -174,9 +175,6 @@ namespace RTSS_time_reader
                         State |= PipeReaderState.FileOpened;
 
                         WritingFileLoop();
-
-                        m_task = null;
-                        State = PipeReaderState.None;
                     }
                     finally
                     {
@@ -188,6 +186,9 @@ namespace RTSS_time_reader
                                 m_taskThreadHandle = Win32A.INVALID_HANDLE_PTR;
                             }
                         }
+
+                        m_task = null;
+                        State = PipeReaderState.None;
                     }
                 }
                 , CancellationToken.None
@@ -225,7 +226,8 @@ namespace RTSS_time_reader
                     , (uint) Win32A.PipeOpenModeFlags.PIPE_ACCESS_DUPLEX
                     ,
                     (uint)
-                    (Win32A.PipeModeFlags.PIPE_TYPE_MESSAGE | Win32A.PipeModeFlags.PIPE_READMODE_MESSAGE | Win32A.PipeModeFlags.PIPE_WAIT)
+                    (Win32A.PipeModeFlags.PIPE_TYPE_MESSAGE | Win32A.PipeModeFlags.PIPE_READMODE_MESSAGE |
+                     Win32A.PipeModeFlags.PIPE_WAIT)
                     , 1
                     , 1024, 1024
                     , 0, IntPtr.Zero);
@@ -249,7 +251,16 @@ namespace RTSS_time_reader
 
                 m_lastException = null;
 
-                m_pipeStream.WaitForConnection();
+                SetFlag(PipeReaderState.PipeIO, true);
+                try
+                {
+                    m_pipeStream.WaitForConnection();
+                }
+                finally
+                {
+                    SetFlag(PipeReaderState.PipeIO, false);
+                }
+
                 result = true;
                 State |= PipeReaderState.ConnectionAccepted;
 
@@ -264,6 +275,9 @@ namespace RTSS_time_reader
             {
                 m_lastException = exception;
                 State |= PipeReaderState.Error;
+            }
+            catch (System.OperationCanceledException)
+            {
             }
             catch (Exception exception)
             {
