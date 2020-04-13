@@ -19,12 +19,21 @@ namespace RTSS_time_reader
         private TaskScheduler m_uiScheduler;
         private readonly PipeReader m_pipeReader;
 
+        private ushort? m_globalHotkeyAtom;
+        private int? m_startStopWritingHotkeyId;
+        private Keys? m_registredHotkey;
 
         public MainForm()
         {
             InitializeComponent();
 
             m_uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+
+            var newAtom = Win32A.GlobalAddAtom("RTSS_time_reader");
+            if (newAtom != 0)
+            {
+                m_globalHotkeyAtom = newAtom;
+            }
 
             m_timer = new System.Timers.Timer();
             m_timer.AutoReset = true;
@@ -63,6 +72,10 @@ namespace RTSS_time_reader
         {
             base.OnClosing(e);
 
+            if (m_globalHotkeyAtom.HasValue)
+            {
+                Win32A.GlobalDeleteAtom(m_globalHotkeyAtom.Value);
+            }
             m_pipeReader.Dispose();
         }
 
@@ -158,6 +171,35 @@ namespace RTSS_time_reader
             m_pipeReader.PipeName = txtPipeName.Text;
             m_pipeReader.WriteFrapsFileFormat = chkFrapsFormat.Checked;
             m_pipeReader.StartAcceptingConnections();
+        }
+
+        protected override void WndProc(ref Message msg)
+        {
+            base.WndProc(ref msg);
+
+            if (msg.Msg == (int) Win32A.WindowsMessages.WM_HOTKEY)
+            {
+                var lParam = msg.LParam.ToInt32();
+                Keys key = (Keys)((lParam >> 16) & 0xFFFF);
+                Win32A.KeyModifiers modifier = (Win32A.KeyModifiers)(lParam & 0xFFFF);
+
+                int hotkeyId = msg.WParam.ToInt32();
+            }
+        }
+
+        private void txtHotkeyEditor_Enter(object sender, EventArgs e)
+        {
+            var dialog = new HotkeyEditorDialog();
+            dialog.Atom = m_globalHotkeyAtom;
+            dialog.Hotkey = m_registredHotkey;
+            dialog.RegistredHotkeyId = m_startStopWritingHotkeyId;
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                m_startStopWritingHotkeyId = dialog.RegistredHotkeyId;
+                m_registredHotkey = dialog.RegistredHotkey;
+            }
+
+            this.ActiveControl = null;
         }
     }
 }

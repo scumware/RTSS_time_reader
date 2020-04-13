@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace RTSS_time_reader
 {
@@ -8,14 +9,14 @@ namespace RTSS_time_reader
     public static class Win32A
     {
         public const int ERROR_SUCCESS = 0;
-        public const uint INVALID_HANDLE_VALUE = unchecked((uint)-1);
+        public const uint INVALID_HANDLE_VALUE = unchecked((uint) -1);
         public static unsafe IntPtr INVALID_HANDLE_PTR;
 
         static Win32A()
         {
             unsafe
             {
-                INVALID_HANDLE_PTR = new IntPtr((void*)INVALID_HANDLE_VALUE);
+                INVALID_HANDLE_PTR = new IntPtr((void*) INVALID_HANDLE_VALUE);
             }
         }
 
@@ -46,18 +47,18 @@ namespace RTSS_time_reader
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
         private static extern IntPtr CreateNamedPipeA(string lpName,
-                                                        uint dwOpenMode,
-                                                        uint dwPipeMode,
-                                                        uint nMaxInstances,
-                                                        uint nOutBufferSize,
-                                                        uint nInBufferSize,
-                                                        uint nDefaultTimeOut,
-                                                        IntPtr lpSecurityAttributes);
+            uint dwOpenMode,
+            uint dwPipeMode,
+            uint nMaxInstances,
+            uint nOutBufferSize,
+            uint nInBufferSize,
+            uint nDefaultTimeOut,
+            IntPtr lpSecurityAttributes);
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern bool GetNamedPipeClientProcessId(
-          IntPtr hPipe,
-          out uint ClientProcessId
+            IntPtr hPipe,
+            out uint ClientProcessId
         );
 
         [Flags]
@@ -80,15 +81,95 @@ namespace RTSS_time_reader
             //One of the following type modes can be specified. The same type mode must be specified for each instance of the pipe.
             PIPE_TYPE_BYTE = 0x00000000,
             PIPE_TYPE_MESSAGE = 0x00000004,
+
             //One of the following read modes can be specified. Different instances of the same pipe can specify different read modes
             PIPE_READMODE_BYTE = 0x00000000,
             PIPE_READMODE_MESSAGE = 0x00000002,
+
             //One of the following wait modes can be specified. Different instances of the same pipe can specify different wait modes.
             PIPE_WAIT = 0x00000000,
             PIPE_NOWAIT = 0x00000001,
+
             //One of the following remote-client modes can be specified. Different instances of the same pipe can specify different remote-client modes.
             PIPE_ACCEPT_REMOTE_CLIENTS = 0x00000000,
             PIPE_REJECT_REMOTE_CLIENTS = 0x00000008
         }
+
+
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern bool RegisterHotKey(IntPtr hWnd, int id, KeyModifiers fsModifiers, int vk);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        [Flags]
+        public enum KeyModifiers : int
+        {
+            None = 0,
+            Alt = 1,
+            Ctrl = 2,
+            Shift = 4,
+            Win = 8,
+            MOD_NOREPEAT = 0x4000
+        }
+
+        public static string GetDescription(this KeyModifiers p_value)
+        {
+            if (p_value == KeyModifiers.None)
+                return p_value.ToString();
+
+            var result = string.Empty;
+            var firstMod = true;
+
+            result += Result(p_value, KeyModifiers.Ctrl, ref firstMod);
+            result += Result(p_value, KeyModifiers.Alt, ref firstMod);
+            result += Result(p_value, KeyModifiers.Shift, ref firstMod);
+            result += Result(p_value, KeyModifiers.Win, ref firstMod);
+
+            return result;
+        }
+
+        private static string Result(KeyModifiers p_value, KeyModifiers modifier, ref bool firstMod)
+        {
+            string result = string.Empty;
+
+            if ((p_value & modifier) != 0)
+            {
+                if (firstMod)
+                    result += modifier;
+                else
+                    result += "+" + modifier;
+
+                firstMod = false;
+            }
+
+            return result;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern ushort GlobalAddAtom(string lpString);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        public static extern ushort GlobalDeleteAtom(ushort nAtom);
+
+        public enum WindowsMessages : int
+        {
+            WM_HOTKEY = 0x0312
+            ,
+            WM_KEYDOWN = 0x0100
+            ,
+            WM_KEYUP = 0x0101
+            ,
+            WM_SYSKEYDOWN = 0x0104
+            ,
+            WM_SYSKEYUP = 0x0105
+            ,
+            WM_CHAR  = 0x0102
+        }
+
+        [DllImport("user32.dll")]
+        public static extern int GetKeyNameText(int lParam, [Out] StringBuilder lpString,
+            int nSize);
     }
 }

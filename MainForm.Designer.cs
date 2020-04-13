@@ -42,7 +42,12 @@
             this.lblEroor = new System.Windows.Forms.Label();
             this.lblErrorInfo = new System.Windows.Forms.Label();
             this.chkFrapsFormat = new System.Windows.Forms.CheckBox();
+            this.flowLayoutPanel1 = new System.Windows.Forms.FlowLayoutPanel();
+            this.rbStartWritingImmediately = new System.Windows.Forms.RadioButton();
+            this.rbUseHotkey = new System.Windows.Forms.RadioButton();
+            this.txtHotkeyEditor = new System.Windows.Forms.TextBox();
             this.tableLayoutPanel1.SuspendLayout();
+            this.flowLayoutPanel1.SuspendLayout();
             this.SuspendLayout();
             // 
             // tableLayoutPanel1
@@ -64,7 +69,7 @@
             this.tableLayoutPanel1.Controls.Add(this.lblFIleName, 1, 5);
             this.tableLayoutPanel1.Controls.Add(this.lblEroor, 0, 6);
             this.tableLayoutPanel1.Controls.Add(this.lblErrorInfo, 1, 6);
-            this.tableLayoutPanel1.Controls.Add(this.chkFrapsFormat, 1, 2);
+            this.tableLayoutPanel1.Controls.Add(this.flowLayoutPanel1, 1, 2);
             this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
@@ -72,7 +77,7 @@
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
@@ -83,7 +88,7 @@
             // 
             this.btnStopStart.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnStopStart.Location = new System.Drawing.Point(582, 119);
+            this.btnStopStart.Location = new System.Drawing.Point(582, 139);
             this.btnStopStart.Name = "btnStopStart";
             this.btnStopStart.Size = new System.Drawing.Size(200, 23);
             this.btnStopStart.TabIndex = 3;
@@ -96,7 +101,7 @@
             this.lblPipeName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.lblPipeName.AutoSize = true;
-            this.lblPipeName.Location = new System.Drawing.Point(3, 42);
+            this.lblPipeName.Location = new System.Drawing.Point(3, 39);
             this.lblPipeName.Margin = new System.Windows.Forms.Padding(3, 0, 3, 3);
             this.lblPipeName.Name = "lblPipeName";
             this.lblPipeName.Size = new System.Drawing.Size(75, 13);
@@ -108,7 +113,7 @@
             this.lblFolder.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.lblFolder.AutoSize = true;
-            this.lblFolder.Location = new System.Drawing.Point(3, 84);
+            this.lblFolder.Location = new System.Drawing.Point(3, 81);
             this.lblFolder.Margin = new System.Windows.Forms.Padding(3, 26, 3, 3);
             this.lblFolder.Name = "lblFolder";
             this.lblFolder.Size = new System.Drawing.Size(75, 13);
@@ -120,7 +125,7 @@
             this.txtPipeName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.txtPipeName.Enabled = false;
-            this.txtPipeName.Location = new System.Drawing.Point(84, 35);
+            this.txtPipeName.Location = new System.Drawing.Point(84, 32);
             this.txtPipeName.MinimumSize = new System.Drawing.Size(100, 4);
             this.txtPipeName.Name = "txtPipeName";
             this.txtPipeName.Size = new System.Drawing.Size(492, 20);
@@ -131,7 +136,7 @@
             // 
             this.txtFolder.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtFolder.Location = new System.Drawing.Point(84, 81);
+            this.txtFolder.Location = new System.Drawing.Point(84, 78);
             this.txtFolder.Margin = new System.Windows.Forms.Padding(3, 23, 3, 3);
             this.txtFolder.MinimumSize = new System.Drawing.Size(100, 4);
             this.txtFolder.Name = "txtFolder";
@@ -142,7 +147,7 @@
             // 
             this.btnSelectFolder.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnSelectFolder.Location = new System.Drawing.Point(582, 81);
+            this.btnSelectFolder.Location = new System.Drawing.Point(582, 78);
             this.btnSelectFolder.Margin = new System.Windows.Forms.Padding(3, 23, 3, 3);
             this.btnSelectFolder.Name = "btnSelectFolder";
             this.btnSelectFolder.Size = new System.Drawing.Size(200, 23);
@@ -241,12 +246,55 @@
             this.chkFrapsFormat.AutoSize = true;
             this.chkFrapsFormat.Checked = true;
             this.chkFrapsFormat.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkFrapsFormat.Location = new System.Drawing.Point(84, 119);
+            this.flowLayoutPanel1.SetFlowBreak(this.chkFrapsFormat, true);
+            this.chkFrapsFormat.Location = new System.Drawing.Point(3, 3);
             this.chkFrapsFormat.Name = "chkFrapsFormat";
             this.chkFrapsFormat.Size = new System.Drawing.Size(137, 17);
             this.chkFrapsFormat.TabIndex = 5;
             this.chkFrapsFormat.Text = "Write FRAPS file format";
             this.chkFrapsFormat.UseVisualStyleBackColor = true;
+            // 
+            // flowLayoutPanel1
+            // 
+            this.flowLayoutPanel1.AutoSize = true;
+            this.flowLayoutPanel1.Controls.Add(this.chkFrapsFormat);
+            this.flowLayoutPanel1.Controls.Add(this.rbStartWritingImmediately);
+            this.flowLayoutPanel1.Controls.Add(this.rbUseHotkey);
+            this.flowLayoutPanel1.Controls.Add(this.txtHotkeyEditor);
+            this.flowLayoutPanel1.Location = new System.Drawing.Point(84, 113);
+            this.flowLayoutPanel1.Name = "flowLayoutPanel1";
+            this.flowLayoutPanel1.Size = new System.Drawing.Size(444, 49);
+            this.flowLayoutPanel1.TabIndex = 7;
+            // 
+            // rbStartWritingImmediately
+            // 
+            this.rbStartWritingImmediately.AutoSize = true;
+            this.rbStartWritingImmediately.Location = new System.Drawing.Point(3, 26);
+            this.rbStartWritingImmediately.Name = "rbStartWritingImmediately";
+            this.rbStartWritingImmediately.Size = new System.Drawing.Size(153, 17);
+            this.rbStartWritingImmediately.TabIndex = 7;
+            this.rbStartWritingImmediately.Text = "Start writing file immediately";
+            this.rbStartWritingImmediately.UseVisualStyleBackColor = true;
+            // 
+            // rbUseHotkey
+            // 
+            this.rbUseHotkey.AutoSize = true;
+            this.rbUseHotkey.Checked = true;
+            this.rbUseHotkey.Location = new System.Drawing.Point(162, 26);
+            this.rbUseHotkey.Name = "rbUseHotkey";
+            this.rbUseHotkey.Size = new System.Drawing.Size(143, 17);
+            this.rbUseHotkey.TabIndex = 8;
+            this.rbUseHotkey.TabStop = true;
+            this.rbUseHotkey.Text = "Start and Stop on hotkey";
+            this.rbUseHotkey.UseVisualStyleBackColor = true;
+            // 
+            // txtHotkeyEditor
+            // 
+            this.txtHotkeyEditor.Location = new System.Drawing.Point(311, 26);
+            this.txtHotkeyEditor.Name = "txtHotkeyEditor";
+            this.txtHotkeyEditor.Size = new System.Drawing.Size(130, 20);
+            this.txtHotkeyEditor.TabIndex = 9;
+            this.txtHotkeyEditor.Enter += new System.EventHandler(this.txtHotkeyEditor_Enter);
             // 
             // MainForm
             // 
@@ -258,6 +306,8 @@
             this.Text = "RTSS frametime to CSV";
             this.tableLayoutPanel1.ResumeLayout(false);
             this.tableLayoutPanel1.PerformLayout();
+            this.flowLayoutPanel1.ResumeLayout(false);
+            this.flowLayoutPanel1.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -278,6 +328,10 @@
         private System.Windows.Forms.Label lblConnectionInfo;
         private System.Windows.Forms.Label lblEroor;
         private System.Windows.Forms.CheckBox chkFrapsFormat;
+        private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel1;
+        private System.Windows.Forms.RadioButton rbStartWritingImmediately;
+        private System.Windows.Forms.RadioButton rbUseHotkey;
+        private System.Windows.Forms.TextBox txtHotkeyEditor;
     }
 }
 
