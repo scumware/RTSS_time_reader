@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Forms;
@@ -22,6 +23,7 @@ namespace RTSS_time_reader
         private ushort? m_globalHotkeyAtom;
         private int? m_startStopWritingHotkeyId;
         private Keys? m_registredHotkey;
+        private Win32A.KeyModifiers? m_registredHotkeyModifiers;
 
         public MainForm()
         {
@@ -63,9 +65,42 @@ namespace RTSS_time_reader
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-             
+
+            m_globalHotkeyAtom = Win32A.GlobalAddAtom("RTSS_READER_HOTKEYs");
+            var keyModifiers = Win32A.KeyModifiers.Alt | Win32A.KeyModifiers.Ctrl;
+            var key = Keys.NumLock;
+
+            var registered = RegisterHotkey(m_globalHotkeyAtom.Value, keyModifiers, key);
+            if (registered)
+                txtHotkeyEditor.Text = keyModifiers.GetDescription() + "+" + key;
+            else
+                txtHotkeyEditor.Text = Win32A.KeyModifiers.None.ToString();
+
             UpdateStatus();
             StartListening();
+        }
+
+        public bool RegisterHotkey(ushort atom, Win32A.KeyModifiers keyModifiers, Keys key)
+        {
+            var result = Win32A.RegisterHotKey(this.Handle, atom, keyModifiers, (int) Keys.NumLock);
+            if (result)
+            {
+                m_registredHotkeyModifiers = keyModifiers;
+                m_registredHotkey = key;
+                m_globalHotkeyAtom = atom;
+            }
+            else
+            {
+                var win32Error = Marshal.GetLastWin32Error();
+                if (win32Error != Win32A.ERROR_SUCCESS)
+                {
+                    var ex = new Win32Exception();
+                    MessageBox.Show(ex.Message, "Cannot regitster hotkey", MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                }
+            }
+
+            return result;
         }
 
         protected override void OnClosing(CancelEventArgs e)
@@ -191,8 +226,10 @@ namespace RTSS_time_reader
         {
             var dialog = new HotkeyEditorDialog();
             dialog.Atom = m_globalHotkeyAtom;
-            dialog.Hotkey = m_registredHotkey;
+            dialog.RegistredHotkeyModifiers = m_registredHotkeyModifiers;
+            dialog.RegistredHotkey = m_registredHotkey;
             dialog.RegistredHotkeyId = m_startStopWritingHotkeyId;
+            dialog.HotkeyProcessor = this;
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
                 m_startStopWritingHotkeyId = dialog.RegistredHotkeyId;

@@ -20,11 +20,37 @@ namespace RTSS_time_reader
 
         public ushort? Atom { get; set; }
         public int? RegistredHotkeyId { get; set; }
-        public Keys? Hotkey { get; set; }
-        public Keys? RegistredHotkey { get; set; }
 
-        private Keys m_pressedKey = 0;
-        private Win32A.KeyModifiers m_keyModifiers;
+        public Keys? NewHotkey { get; private set; }
+        public Keys? RegistredHotkey
+        {
+            get { return m_registredHotkey; }
+            set
+            {
+                m_registredHotkey = value;
+                if (value.HasValue)
+                    NewHotkey = value.Value;
+            }
+        }
+
+        public Win32A.KeyModifiers? RegistredHotkeyModifiers
+        {
+            get { return m_registredHotkeyModifiers; }
+            set
+            {
+                m_registredHotkeyModifiers = value;
+                if (value.HasValue)
+                    NewKeyModifiers = value.Value;
+            }
+        }
+
+        public Win32A.KeyModifiers NewKeyModifiers { get; private set; }
+        public MainForm HotkeyProcessor { get; set; }
+
+        private bool m_hotkeyAccepted;
+        private Keys? m_registredHotkey;
+        private Win32A.KeyModifiers? m_registredHotkeyModifiers;
+        private Win32A.KeyModifiers m_pressedKeyModifiers;
 
         protected override bool ProcessKeyPreview(ref Message p_message)
         {
@@ -35,7 +61,7 @@ namespace RTSS_time_reader
             switch (msg)
             {
                 case Win32A.WindowsMessages.WM_SYSKEYDOWN:
-                    m_keyModifiers |= Win32A.KeyModifiers.Alt;
+                    NewKeyModifiers |= Win32A.KeyModifiers.Alt;
                     ShowPressedKeys();
                     return true;
 
@@ -43,23 +69,35 @@ namespace RTSS_time_reader
                     var key = GetVkKey(p_message);
                     if (key == Keys.ControlKey)
                     {
-                        m_keyModifiers |= Win32A.KeyModifiers.Ctrl;
+                        NewKeyModifiers |= Win32A.KeyModifiers.Ctrl;
+                        m_pressedKeyModifiers |= Win32A.KeyModifiers.Ctrl;
                     }
                     else if (key == Keys.ShiftKey)
                     {
-                        m_keyModifiers |= Win32A.KeyModifiers.Shift;
+                        NewKeyModifiers |= Win32A.KeyModifiers.Shift;
+                        m_pressedKeyModifiers |= Win32A.KeyModifiers.Shift;
                     }
                     else if ((key == Keys.LWin) || (key == Keys.RWin))
                     {
-                        m_keyModifiers |= Win32A.KeyModifiers.Win;
+                        NewKeyModifiers |= Win32A.KeyModifiers.Win;
+                        m_pressedKeyModifiers |= Win32A.KeyModifiers.Win;
                     }
                     else if (key == Keys.Menu)
                     {
-                        m_keyModifiers |= Win32A.KeyModifiers.Alt;
+                        NewKeyModifiers |= Win32A.KeyModifiers.Alt;
+                        m_pressedKeyModifiers |= Win32A.KeyModifiers.Alt;
+                    }
+                    else if ((key == Keys.Back) && (m_pressedKeyModifiers == Win32A.KeyModifiers.None))
+                    {
+                        NewHotkey = Keys.None;
+                        NewKeyModifiers = Win32A.KeyModifiers.None;
+                        m_hotkeyAccepted = false;
                     }
                     else
                     {
-                        m_pressedKey = key;
+                        NewHotkey = key;
+                        if (NewKeyModifiers != Win32A.KeyModifiers.None)
+                            m_hotkeyAccepted = true;
                     }
 
                     ShowPressedKeys();
@@ -68,33 +106,80 @@ namespace RTSS_time_reader
 
 
                 case Win32A.WindowsMessages.WM_SYSKEYUP:
-                    m_keyModifiers &= ~Win32A.KeyModifiers.Alt;
+                    key = GetVkKey(p_message);
+                    if (m_hotkeyAccepted)
+                    {
+                        if (key == Keys.ControlKey)
+                        {
+                            m_pressedKeyModifiers &= ~Win32A.KeyModifiers.Ctrl;
+                        }
+                        else if (key == Keys.ShiftKey)
+                        {
+                            m_pressedKeyModifiers &= ~Win32A.KeyModifiers.Shift;
+                        }
+                        else if ((key == Keys.LWin) || (key == Keys.RWin))
+                        {
+                            m_pressedKeyModifiers &= ~Win32A.KeyModifiers.Win;
+                        }
+
+                        m_pressedKeyModifiers &= ~Win32A.KeyModifiers.Alt;
+                        ShowPressedKeys();
+                    }
+                    else
+                    {
+                        NewKeyModifiers &= ~Win32A.KeyModifiers.Alt;
+                    }
                     ShowPressedKeys();
                     return true;
 
                 case Win32A.WindowsMessages.WM_KEYUP:
                     key = GetVkKey(p_message);
-
-                    if (key == Keys.ControlKey)
+                    if (false == m_hotkeyAccepted)
                     {
-                        m_keyModifiers &= ~Win32A.KeyModifiers.Ctrl;
-                    }
-                    else if (key == Keys.ShiftKey)
-                    {
-                        m_keyModifiers &= ~Win32A.KeyModifiers.Shift;
-                    }
-                    else if ((key == Keys.LWin) || (key == Keys.RWin))
-                    {
-                        m_keyModifiers &= ~Win32A.KeyModifiers.Win;
-                    }
-                    else if (key == Keys.Menu)
-                    {
-                        m_keyModifiers &= ~Win32A.KeyModifiers.Alt;
+                        if (key == Keys.ControlKey)
+                        {
+                            NewKeyModifiers &= ~Win32A.KeyModifiers.Ctrl;
+                        }
+                        else if (key == Keys.ShiftKey)
+                        {
+                            NewKeyModifiers &= ~Win32A.KeyModifiers.Shift;
+                        }
+                        else if ((key == Keys.LWin) || (key == Keys.RWin))
+                        {
+                            NewKeyModifiers &= ~Win32A.KeyModifiers.Win;
+                        }
+                        else if (key == Keys.Menu)
+                        {
+                            NewKeyModifiers &= ~Win32A.KeyModifiers.Alt;
+                        }
+                        else
+                        {
+                            if (NewKeyModifiers == Win32A.KeyModifiers.None)
+                                NewHotkey &= ~key;
+                            else
+                                m_hotkeyAccepted = true;
+                        }
                     }
                     else
                     {
-                        m_pressedKey &= ~key;
+                        if (key == Keys.ControlKey)
+                        {
+                            m_pressedKeyModifiers &= ~Win32A.KeyModifiers.Ctrl;
+                        }
+                        else if (key == Keys.ShiftKey)
+                        {
+                            m_pressedKeyModifiers &= ~Win32A.KeyModifiers.Shift;
+                        }
+                        else if ((key == Keys.LWin) || (key == Keys.RWin))
+                        {
+                            m_pressedKeyModifiers &= ~Win32A.KeyModifiers.Win;
+                        }
+                        else if (key == Keys.Menu)
+                        {
+                            m_pressedKeyModifiers &= ~Win32A.KeyModifiers.Alt;
+                        }
                     }
+
                     ShowPressedKeys();
                     return true;
 
@@ -107,17 +192,17 @@ namespace RTSS_time_reader
 
         private void ShowPressedKeys()
         {
-            if (m_keyModifiers == Win32A.KeyModifiers.None)
+            if (NewKeyModifiers == Win32A.KeyModifiers.None)
             {
                 txtHotkeyEditor.Text = Win32A.KeyModifiers.None.ToString();
                 return;
             }
-            if (m_pressedKey != Keys.None)
-                txtHotkeyEditor.Text = m_keyModifiers.GetDescription() + "+" + m_pressedKey;
+            if (NewHotkey != Keys.None)
+                txtHotkeyEditor.Text = NewKeyModifiers.GetDescription() + "+" + NewHotkey;
             else
-                txtHotkeyEditor.Text = m_keyModifiers.GetDescription();
+                txtHotkeyEditor.Text = NewKeyModifiers.GetDescription();
         }
-
+/*
         private void DebugPrint(Message p_message, Keys key)
         {
             Win32A.WindowsMessages msg = (Win32A.WindowsMessages)p_message.Msg;
@@ -128,20 +213,34 @@ namespace RTSS_time_reader
             int scanCode = (p_message.LParam.ToInt32() >> 16) & 0xff;
             Debug.Print(msg + "_scancode: " + scanCode.ToString("X8"));
 
-            Debug.Print("allPressed: " + m_pressedKey);
+            Debug.Print("allPressed: " + NewHotkey);
 
             /*
                     var sb = new StringBuilder(32);
                     Win32A.GetKeyNameText(p_message.LParam.ToInt32(), sb, sb.Capacity);
                     Debug.Print(sb.ToString());
              
-             */
+             -/
         }
-
+*/
 
         private static Keys GetVkKey(Message p_message)
         {
             return (Keys) p_message.WParam;
+        }
+
+        private void btnOk_Click(object sender, EventArgs e)
+        {
+            if (m_hotkeyAccepted)
+            {
+                var result = HotkeyProcessor.RegisterHotkey(Atom.Value, NewKeyModifiers, NewHotkey.Value);
+                if (false == result)
+                    DialogResult = DialogResult.None;
+            }
+            else
+            {
+                DialogResult = DialogResult.None;
+            }
         }
     }
 }

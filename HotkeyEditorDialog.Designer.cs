@@ -31,8 +31,8 @@
             this.btnOk = new System.Windows.Forms.Button();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.txtHotkeyEditor = new System.Windows.Forms.TextBox();
-            this.btnCancel = new System.Windows.Forms.Button();
             this.layoutPanelButtons = new System.Windows.Forms.FlowLayoutPanel();
+            this.btnCancel = new System.Windows.Forms.Button();
             this.lblEnterHotkey = new System.Windows.Forms.Label();
             this.tableLayoutPanel1.SuspendLayout();
             this.layoutPanelButtons.SuspendLayout();
@@ -47,6 +47,7 @@
             this.btnOk.TabIndex = 0;
             this.btnOk.Text = "OK";
             this.btnOk.UseVisualStyleBackColor = true;
+            this.btnOk.Click += new System.EventHandler(this.btnOk_Click);
             // 
             // tableLayoutPanel1
             // 
@@ -70,20 +71,10 @@
             // txtHotkeyEditor
             // 
             this.txtHotkeyEditor.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtHotkeyEditor.Location = new System.Drawing.Point(81, 47);
+            this.txtHotkeyEditor.Location = new System.Drawing.Point(81, 48);
             this.txtHotkeyEditor.Name = "txtHotkeyEditor";
             this.txtHotkeyEditor.Size = new System.Drawing.Size(229, 20);
             this.txtHotkeyEditor.TabIndex = 10;
-            // 
-            // btnCancel
-            // 
-            this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCancel.Location = new System.Drawing.Point(150, 3);
-            this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(75, 23);
-            this.btnCancel.TabIndex = 11;
-            this.btnCancel.Text = "Cancel";
-            this.btnCancel.UseVisualStyleBackColor = true;
             // 
             // layoutPanelButtons
             // 
@@ -98,11 +89,22 @@
             this.layoutPanelButtons.Size = new System.Drawing.Size(309, 29);
             this.layoutPanelButtons.TabIndex = 12;
             // 
+            // btnCancel
+            // 
+            this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.btnCancel.Location = new System.Drawing.Point(150, 3);
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.Size = new System.Drawing.Size(75, 23);
+            this.btnCancel.TabIndex = 11;
+            this.btnCancel.Text = "Cancel";
+            this.btnCancel.UseVisualStyleBackColor = true;
+            // 
             // lblEnterHotkey
             // 
             this.lblEnterHotkey.Anchor = System.Windows.Forms.AnchorStyles.Right;
             this.lblEnterHotkey.AutoSize = true;
-            this.lblEnterHotkey.Location = new System.Drawing.Point(5, 50);
+            this.lblEnterHotkey.Location = new System.Drawing.Point(5, 52);
             this.lblEnterHotkey.Name = "lblEnterHotkey";
             this.lblEnterHotkey.Size = new System.Drawing.Size(70, 13);
             this.lblEnterHotkey.TabIndex = 13;
