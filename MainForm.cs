@@ -28,6 +28,7 @@ namespace RTSS_time_reader
         private Win32A.KeyModifiers? m_registredHotkeyModifiers;
         private bool m_previousStateIsError = false;
         private TimeSpan m_remainedTimeSpan;
+        private TimeSpan m_flushTimerPeriod;
 
         public MainForm()
         {
@@ -41,9 +42,11 @@ namespace RTSS_time_reader
                 m_globalHotkeyAtom = newAtom;
             }
 
+            m_flushTimerPeriod = new TimeSpan(0, 0, 1);
+
             m_flushFileTimer = new System.Timers.Timer();
             m_flushFileTimer.AutoReset = true;
-            m_flushFileTimer.Interval = 1000;
+            m_flushFileTimer.Interval = m_flushTimerPeriod.TotalMilliseconds;
             m_flushFileTimer.Elapsed += OnFlushFileTimerElapsed;
 
             m_stopWritingTimer = new System.Timers.Timer();
@@ -61,11 +64,6 @@ namespace RTSS_time_reader
             m_pipeReader.StopWritingFile();
         }
 
-        private string FileFullName()
-        {
-            return Path.Combine(txtFolder.Text, "RTSS_Values.txt");
-        }
-
         private void OnFlushFileTimerElapsed(object p_sender, ElapsedEventArgs p_elapsedEventArgs)
         {
             if (m_pipeReader != null && m_pipeReader.IsConnectionAccepted && m_pipeReader.EnabledWritingFile)
@@ -73,8 +71,14 @@ namespace RTSS_time_reader
                 m_pipeReader.FlushFileBuffer();
                 Action action = () =>
                 {
-                    m_remainedTimeSpan -= new TimeSpan(0, 0, 1);
+                    m_remainedTimeSpan -= m_flushTimerPeriod;
                     lblRemained.Text = "remainded: " + m_remainedTimeSpan.ToString("c");
+
+                    m_lblWritingFileVisible = !m_lblWritingFileVisible;
+                    lblWritingFile.ForeColor = m_lblWritingFileVisible ?
+                        Color.OrangeRed
+                        :
+                        this.BackColor;
                 };
                 Invoke(action);
             }
@@ -139,7 +143,8 @@ namespace RTSS_time_reader
             if (dialogResult == DialogResult.OK)
             {
                 txtFolder.Text = dialog.SelectedPath;
-                m_pipeReader.StartFileName = Path.Combine(txtFolder.Text, "RTSS_Values.txt");
+                m_pipeReader.StartFileName = Path.Combine("RTSS_Values.txt");
+                m_pipeReader.TargetFolder = txtFolder.Text;
             }
         }
 
@@ -149,7 +154,17 @@ namespace RTSS_time_reader
             btnStopStart.Enabled = false;
 
             if (m_pipeReader.IsStarted)
-                m_pipeReader.Stop();
+            {
+                if (m_pipeReader.IsConnectionAccepted)
+                {
+                    m_pipeReader.ContinueAcceptingConnections = true;
+                       m_pipeReader.DropConnection();
+                }
+                else
+                {
+                    m_pipeReader.Stop();
+                }
+            }
             else
                 StartListening();
         }
@@ -184,48 +199,78 @@ namespace RTSS_time_reader
 
         private void rbUseHotkey_CheckedChanged(object sender, EventArgs e)
         {
-            txtHotkeyEditor.Enabled = rbUseHotkey.Checked;
+            txtHotkeyEditor.Enabled = chkUseHotkey.Checked;
         }
 
         private void rbStartWritingImmediately_CheckedChanged(object sender, EventArgs e)
         {
-            m_pipeReader.EnabledWritingFile = rbStartWritingImmediately.Checked;
+            m_pipeReader.EnabledWritingFile = chkStartWritingImmediately.Checked;
         }
+
+        private PipeReaderState m_previousPipeReaderState;
+        private bool m_lblWritingFileVisible;
 
         public void UpdateStatus()
         {
             if (InvokeRequired)
             {
-                BeginInvoke(new Action (UpdateStatus));
+                BeginInvoke(new Action(UpdateStatus));
                 return;
             }
+
+            var currentReaderState = m_pipeReader.State;
+
+            var clearedFlags = m_previousPipeReaderState & ~currentReaderState;
+            var newFlags = currentReaderState & ~m_previousPipeReaderState;
+            /*
+
+                        Debug.Print(Environment.NewLine);
+                        Debug.Print("=====================================================================");
+                        Debug.Print("Invoked state: {0}", currentReaderState);
+
+                        if (newFlags != PipeReaderState.None)
+                            Debug.Print("New flags: {0}", newFlags);
+                        if (clearedFlags != PipeReaderState.None)
+                            Debug.Print("Cleared flags: {0}", clearedFlags);
+
+            */
+
+            if (clearedFlags == PipeReaderState.ConnectionAccepted)
+            {
+                m_pipeReader.EnabledWritingFile = chkStartWritingImmediately.Checked;
+            }
+
             m_flushFileTimer.Enabled = m_pipeReader.IsFileOpened;
 
-            if (m_pipeReader.State != PipeReaderState.None && (false == m_previousStateIsError))
+            if (currentReaderState != PipeReaderState.None && (false == m_previousStateIsError))
             {
                 lblEroor.Visible = lblErrorInfo.Visible = m_pipeReader.IsError;
                 lblErrorInfo.Text = m_pipeReader.IsError ? m_pipeReader.LastException.Message : string.Empty;
             }
+
             m_previousStateIsError = m_pipeReader.IsError;
 
-            if (m_pipeReader.EnabledWritingFile && m_pipeReader.IsConnectionAccepted)
+            if (m_pipeReader.IsConnectionAccepted)
             {
-                if (chkStopOnTimer.Checked)
+                if (m_pipeReader.EnabledWritingFile)
                 {
-                    var timePickerValue = timePicker.Value;
+                    if (chkStopOnTimer.Checked)
+                    {
+                        var timePickerValue = timePicker.Value;
 
-                    var hours = timePickerValue.Hour;
-                    var minutes = timePickerValue.Minute;
-                    var seconds = timePickerValue.Second;
-                    m_remainedTimeSpan = new TimeSpan(hours, minutes, seconds);
+                        var hours = timePickerValue.Hour;
+                        var minutes = timePickerValue.Minute;
+                        var seconds = timePickerValue.Second;
+                        m_remainedTimeSpan = new TimeSpan(hours, minutes, seconds);
 
-                    m_stopWritingTimer.Interval = m_remainedTimeSpan.TotalMilliseconds;
-                    m_stopWritingTimer.Start();
+                        m_stopWritingTimer.Interval = m_remainedTimeSpan.TotalMilliseconds;
+                        m_stopWritingTimer.Start();
 
-                    chkStopOnTimer.Enabled = false;
-                    timePicker.Enabled = false;
-                    lblRemained.Visible = true;
-                    lblRemained.Text = "remainded: "+m_remainedTimeSpan.ToString("c");
+                        chkStopOnTimer.Enabled = false;
+                        timePicker.Enabled = false;
+                        lblRemained.Visible = true;
+                        lblRemained.Text = "remainded: " + m_remainedTimeSpan.ToString("c");
+                    }
                 }
             }
 
@@ -248,17 +293,29 @@ namespace RTSS_time_reader
                 else
                 {
                     lblConnected.Text = "Connected";
-                    lblConnectionInfo.Text = m_pipeReader.PipeFullName + " <-- pID=" + m_pipeReader.ClientProcessId;
+                    lblConnectionInfo.Text = m_pipeReader.PipeFullName + " <-- " + m_pipeReader.ProcessName + "  (pID:" + m_pipeReader.ClientProcessId+")";
                 }
-            } 
+            }
 
-            lblFIleName.Visible  = lblWritingFile.Visible = m_pipeReader.IsFileOpened;
+            lblFIleName.Visible = lblWritingFile.Visible = m_pipeReader.IsFileOpened;
             if (m_pipeReader.IsFileOpened)
-                lblFIleName.Text = m_pipeReader.StartFileName;
+            {
+                lblFIleName.Text = m_pipeReader.OpenedFileName;
+                if (false == m_pipeReader.EnabledWritingFile)
+                {
+                    lblWritingFile.Text = "Opened file:";
+                    lblWritingFile.ForeColor = Color.LimeGreen;
+                }
+                else
+                {
+                    lblWritingFile.Text = "Writing file:";
+                    lblWritingFile.ForeColor = Color.OrangeRed;
+                }
+            }
 
             chkFrapsFormat.Enabled =
-            txtFolder.Enabled =
-            btnSelectFolder.Enabled = (false == m_pipeReader.IsFileOpened);
+                txtFolder.Enabled =
+                    btnSelectFolder.Enabled = (false == m_pipeReader.IsFileOpened);
 
 
             btnStopStart.Enabled = true;
@@ -285,13 +342,18 @@ namespace RTSS_time_reader
             {
                 btnStopStart.Text = "Start listening";
             }
+
+            m_previousPipeReaderState = currentReaderState;
         }
 
         private void StartListening()
         {
-            m_pipeReader.StartFileName = FileFullName();
+            m_pipeReader.StartFileName = "RTSS_Values.txt";
             m_pipeReader.PipeName = txtPipeName.Text;
             m_pipeReader.WriteFrapsFileFormat = chkFrapsFormat.Checked;
+            m_pipeReader.TargetFolder = txtFolder.Text;
+            m_pipeReader.ContinueAcceptingConnections = true;
+
             m_pipeReader.StartAcceptingConnections();
         }
 

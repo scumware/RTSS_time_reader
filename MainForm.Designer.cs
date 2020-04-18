@@ -1,4 +1,6 @@
-﻿namespace RTSS_time_reader
+﻿using System.Windows.Forms;
+
+namespace RTSS_time_reader
 {
     partial class MainForm
     {
@@ -39,18 +41,18 @@
             this.lblErrorInfo = new System.Windows.Forms.Label();
             this.flowLayoutPanel1 = new System.Windows.Forms.FlowLayoutPanel();
             this.chkFrapsFormat = new System.Windows.Forms.CheckBox();
-            this.rbStartWritingImmediately = new System.Windows.Forms.RadioButton();
-            this.rbUseHotkey = new System.Windows.Forms.RadioButton();
+            this.chkStartWritingImmediately = new System.Windows.Forms.CheckBox();
+            this.chkUseHotkey = new System.Windows.Forms.CheckBox();
             this.txtHotkeyEditor = new System.Windows.Forms.TextBox();
             this.btnStopStart = new System.Windows.Forms.Button();
             this.btnSelectFolder = new System.Windows.Forms.Button();
             this.flowLayoutPanel2 = new System.Windows.Forms.FlowLayoutPanel();
             this.chkStopOnTimer = new System.Windows.Forms.CheckBox();
             this.timePicker = new System.Windows.Forms.DateTimePicker();
+            this.lblRemained = new System.Windows.Forms.Label();
             this.stackPipeState = new System.Windows.Forms.FlowLayoutPanel();
             this.lblConnected = new System.Windows.Forms.Label();
             this.lblConnectionInfo = new System.Windows.Forms.Label();
-            this.lblRemained = new System.Windows.Forms.Label();
             this.tableLayoutPanel1.SuspendLayout();
             this.flowLayoutPanel1.SuspendLayout();
             this.flowLayoutPanel2.SuspendLayout();
@@ -100,7 +102,7 @@
             this.lblFolder.Location = new System.Drawing.Point(3, 29);
             this.lblFolder.Margin = new System.Windows.Forms.Padding(3, 26, 3, 5);
             this.lblFolder.Name = "lblFolder";
-            this.lblFolder.Size = new System.Drawing.Size(79, 13);
+            this.lblFolder.Size = new System.Drawing.Size(76, 13);
             this.lblFolder.TabIndex = 1;
             this.lblFolder.Text = "Folder name:";
             // 
@@ -108,11 +110,11 @@
             // 
             this.txtFolder.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtFolder.Location = new System.Drawing.Point(88, 24);
+            this.txtFolder.Location = new System.Drawing.Point(85, 24);
             this.txtFolder.Margin = new System.Windows.Forms.Padding(3, 23, 3, 3);
             this.txtFolder.MinimumSize = new System.Drawing.Size(100, 4);
             this.txtFolder.Name = "txtFolder";
-            this.txtFolder.Size = new System.Drawing.Size(482, 20);
+            this.txtFolder.Size = new System.Drawing.Size(485, 20);
             this.txtFolder.TabIndex = 4;
             // 
             // lblPipeName
@@ -123,7 +125,7 @@
             this.lblPipeName.Location = new System.Drawing.Point(3, 76);
             this.lblPipeName.Margin = new System.Windows.Forms.Padding(3, 0, 3, 5);
             this.lblPipeName.Name = "lblPipeName";
-            this.lblPipeName.Size = new System.Drawing.Size(79, 13);
+            this.lblPipeName.Size = new System.Drawing.Size(76, 13);
             this.lblPipeName.TabIndex = 0;
             this.lblPipeName.Text = "Pipe name:";
             // 
@@ -132,10 +134,10 @@
             this.txtPipeName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.txtPipeName.Enabled = false;
-            this.txtPipeName.Location = new System.Drawing.Point(88, 71);
+            this.txtPipeName.Location = new System.Drawing.Point(85, 71);
             this.txtPipeName.MinimumSize = new System.Drawing.Size(100, 4);
             this.txtPipeName.Name = "txtPipeName";
-            this.txtPipeName.Size = new System.Drawing.Size(482, 20);
+            this.txtPipeName.Size = new System.Drawing.Size(485, 20);
             this.txtPipeName.TabIndex = 2;
             this.txtPipeName.Text = "RTSS_Frametime";
             // 
@@ -149,9 +151,9 @@
             this.lblWritingFile.Location = new System.Drawing.Point(3, 194);
             this.lblWritingFile.Margin = new System.Windows.Forms.Padding(3, 0, 3, 3);
             this.lblWritingFile.Name = "lblWritingFile";
-            this.lblWritingFile.Size = new System.Drawing.Size(79, 13);
+            this.lblWritingFile.Size = new System.Drawing.Size(76, 13);
             this.lblWritingFile.TabIndex = 0;
-            this.lblWritingFile.Text = "Opened File:";
+            this.lblWritingFile.Text = "Opened file:";
             this.lblWritingFile.Visible = false;
             // 
             // lblFIleName
@@ -161,10 +163,10 @@
             this.lblFIleName.AutoSize = true;
             this.lblFIleName.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
             this.lblFIleName.ForeColor = System.Drawing.Color.Green;
-            this.lblFIleName.Location = new System.Drawing.Point(88, 194);
+            this.lblFIleName.Location = new System.Drawing.Point(85, 194);
             this.lblFIleName.Margin = new System.Windows.Forms.Padding(3, 0, 3, 3);
             this.lblFIleName.Name = "lblFIleName";
-            this.lblFIleName.Size = new System.Drawing.Size(482, 13);
+            this.lblFIleName.Size = new System.Drawing.Size(485, 13);
             this.lblFIleName.TabIndex = 0;
             this.lblFIleName.Text = "File name:";
             // 
@@ -178,7 +180,7 @@
             this.lblEroor.Location = new System.Drawing.Point(3, 210);
             this.lblEroor.Margin = new System.Windows.Forms.Padding(3, 0, 3, 3);
             this.lblEroor.Name = "lblEroor";
-            this.lblEroor.Size = new System.Drawing.Size(79, 13);
+            this.lblEroor.Size = new System.Drawing.Size(76, 13);
             this.lblEroor.TabIndex = 0;
             this.lblEroor.Text = "error";
             // 
@@ -189,10 +191,10 @@
             this.lblErrorInfo.AutoSize = true;
             this.lblErrorInfo.Font = new System.Drawing.Font("Consolas", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
             this.lblErrorInfo.ForeColor = System.Drawing.Color.Red;
-            this.lblErrorInfo.Location = new System.Drawing.Point(88, 210);
+            this.lblErrorInfo.Location = new System.Drawing.Point(85, 210);
             this.lblErrorInfo.Margin = new System.Windows.Forms.Padding(3, 0, 3, 3);
             this.lblErrorInfo.Name = "lblErrorInfo";
-            this.lblErrorInfo.Size = new System.Drawing.Size(482, 13);
+            this.lblErrorInfo.Size = new System.Drawing.Size(485, 13);
             this.lblErrorInfo.TabIndex = 0;
             this.lblErrorInfo.Text = "error info";
             // 
@@ -200,12 +202,12 @@
             // 
             this.flowLayoutPanel1.AutoSize = true;
             this.flowLayoutPanel1.Controls.Add(this.chkFrapsFormat);
-            this.flowLayoutPanel1.Controls.Add(this.rbStartWritingImmediately);
-            this.flowLayoutPanel1.Controls.Add(this.rbUseHotkey);
+            this.flowLayoutPanel1.Controls.Add(this.chkStartWritingImmediately);
+            this.flowLayoutPanel1.Controls.Add(this.chkUseHotkey);
             this.flowLayoutPanel1.Controls.Add(this.txtHotkeyEditor);
-            this.flowLayoutPanel1.Location = new System.Drawing.Point(88, 97);
+            this.flowLayoutPanel1.Location = new System.Drawing.Point(85, 97);
             this.flowLayoutPanel1.Name = "flowLayoutPanel1";
-            this.flowLayoutPanel1.Size = new System.Drawing.Size(444, 49);
+            this.flowLayoutPanel1.Size = new System.Drawing.Size(445, 49);
             this.flowLayoutPanel1.TabIndex = 7;
             // 
             // chkFrapsFormat
@@ -221,33 +223,33 @@
             this.chkFrapsFormat.Text = "Write FRAPS file format";
             this.chkFrapsFormat.UseVisualStyleBackColor = true;
             // 
-            // rbStartWritingImmediately
+            // chkStartWritingImmediately
             // 
-            this.rbStartWritingImmediately.AutoSize = true;
-            this.rbStartWritingImmediately.Location = new System.Drawing.Point(3, 26);
-            this.rbStartWritingImmediately.Name = "rbStartWritingImmediately";
-            this.rbStartWritingImmediately.Size = new System.Drawing.Size(153, 17);
-            this.rbStartWritingImmediately.TabIndex = 7;
-            this.rbStartWritingImmediately.Text = "Start writing file immediately";
-            this.rbStartWritingImmediately.UseVisualStyleBackColor = true;
-            this.rbStartWritingImmediately.CheckedChanged += new System.EventHandler(this.rbStartWritingImmediately_CheckedChanged);
+            this.chkStartWritingImmediately.AutoSize = true;
+            this.chkStartWritingImmediately.Location = new System.Drawing.Point(3, 26);
+            this.chkStartWritingImmediately.Name = "chkStartWritingImmediately";
+            this.chkStartWritingImmediately.Size = new System.Drawing.Size(154, 17);
+            this.chkStartWritingImmediately.TabIndex = 7;
+            this.chkStartWritingImmediately.Text = "Start writing file immediately";
+            this.chkStartWritingImmediately.UseVisualStyleBackColor = true;
+            this.chkStartWritingImmediately.CheckedChanged += new System.EventHandler(this.rbStartWritingImmediately_CheckedChanged);
             // 
-            // rbUseHotkey
+            // chkUseHotkey
             // 
-            this.rbUseHotkey.AutoSize = true;
-            this.rbUseHotkey.Checked = true;
-            this.rbUseHotkey.Location = new System.Drawing.Point(162, 26);
-            this.rbUseHotkey.Name = "rbUseHotkey";
-            this.rbUseHotkey.Size = new System.Drawing.Size(143, 17);
-            this.rbUseHotkey.TabIndex = 8;
-            this.rbUseHotkey.TabStop = true;
-            this.rbUseHotkey.Text = "Start and Stop on hotkey";
-            this.rbUseHotkey.UseVisualStyleBackColor = true;
-            this.rbUseHotkey.CheckedChanged += new System.EventHandler(this.rbUseHotkey_CheckedChanged);
+            this.chkUseHotkey.AutoSize = true;
+            this.chkUseHotkey.Checked = true;
+            this.chkUseHotkey.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkUseHotkey.Location = new System.Drawing.Point(163, 26);
+            this.chkUseHotkey.Name = "chkUseHotkey";
+            this.chkUseHotkey.Size = new System.Drawing.Size(143, 17);
+            this.chkUseHotkey.TabIndex = 8;
+            this.chkUseHotkey.Text = "Start and Stop by hotkey";
+            this.chkUseHotkey.UseVisualStyleBackColor = true;
+            this.chkUseHotkey.CheckedChanged += new System.EventHandler(this.rbUseHotkey_CheckedChanged);
             // 
             // txtHotkeyEditor
             // 
-            this.txtHotkeyEditor.Location = new System.Drawing.Point(311, 26);
+            this.txtHotkeyEditor.Location = new System.Drawing.Point(312, 26);
             this.txtHotkeyEditor.Name = "txtHotkeyEditor";
             this.txtHotkeyEditor.Size = new System.Drawing.Size(130, 20);
             this.txtHotkeyEditor.TabIndex = 9;
@@ -287,13 +289,14 @@
             this.flowLayoutPanel2.Location = new System.Drawing.Point(576, 97);
             this.flowLayoutPanel2.Name = "flowLayoutPanel2";
             this.tableLayoutPanel1.SetRowSpan(this.flowLayoutPanel2, 3);
-            this.flowLayoutPanel2.Size = new System.Drawing.Size(206, 62);
+            this.flowLayoutPanel2.Size = new System.Drawing.Size(205, 39);
             this.flowLayoutPanel2.TabIndex = 8;
             // 
             // chkStopOnTimer
             // 
             this.chkStopOnTimer.AutoSize = true;
-            this.chkStopOnTimer.Location = new System.Drawing.Point(3, 3);
+            this.chkStopOnTimer.Location = new System.Drawing.Point(3, 5);
+            this.chkStopOnTimer.Margin = new System.Windows.Forms.Padding(3, 5, 3, 3);
             this.chkStopOnTimer.Name = "chkStopOnTimer";
             this.chkStopOnTimer.Size = new System.Drawing.Size(124, 17);
             this.chkStopOnTimer.TabIndex = 0;
@@ -304,11 +307,23 @@
             // 
             this.flowLayoutPanel2.SetFlowBreak(this.timePicker, true);
             this.timePicker.Format = System.Windows.Forms.DateTimePickerFormat.Time;
-            this.timePicker.Location = new System.Drawing.Point(3, 26);
+            this.timePicker.Location = new System.Drawing.Point(133, 3);
             this.timePicker.Name = "timePicker";
-            this.timePicker.Size = new System.Drawing.Size(200, 20);
+            this.timePicker.ShowUpDown = true;
+            this.timePicker.Size = new System.Drawing.Size(69, 20);
             this.timePicker.TabIndex = 1;
             this.timePicker.Value = new System.DateTime(2020, 4, 18, 0, 4, 0, 0);
+            // 
+            // lblRemained
+            // 
+            this.lblRemained.AutoSize = true;
+            this.lblRemained.ForeColor = System.Drawing.Color.Maroon;
+            this.lblRemained.Location = new System.Drawing.Point(3, 26);
+            this.lblRemained.Name = "lblRemained";
+            this.lblRemained.Size = new System.Drawing.Size(56, 13);
+            this.lblRemained.TabIndex = 2;
+            this.lblRemained.Text = "remained: ";
+            this.lblRemained.Visible = false;
             // 
             // stackPipeState
             // 
@@ -348,17 +363,6 @@
             this.lblConnectionInfo.TabIndex = 0;
             this.lblConnectionInfo.Text = "Pipe name:";
             // 
-            // lblRemained
-            // 
-            this.lblRemained.AutoSize = true;
-            this.lblRemained.ForeColor = System.Drawing.Color.Maroon;
-            this.lblRemained.Location = new System.Drawing.Point(3, 49);
-            this.lblRemained.Name = "lblRemained";
-            this.lblRemained.Size = new System.Drawing.Size(56, 13);
-            this.lblRemained.TabIndex = 2;
-            this.lblRemained.Text = "remained: ";
-            this.lblRemained.Visible = false;
-            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -396,8 +400,8 @@
         private System.Windows.Forms.Label lblEroor;
         private System.Windows.Forms.CheckBox chkFrapsFormat;
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel1;
-        private System.Windows.Forms.RadioButton rbStartWritingImmediately;
-        private System.Windows.Forms.RadioButton rbUseHotkey;
+        private CheckBox chkStartWritingImmediately;
+        private CheckBox chkUseHotkey;
         private System.Windows.Forms.TextBox txtHotkeyEditor;
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel2;
         private System.Windows.Forms.CheckBox chkStopOnTimer;

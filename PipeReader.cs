@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
@@ -16,7 +17,7 @@ namespace RTSS_time_reader
     {
         private volatile NamedPipeServerStream m_pipeStream;
         private volatile FileStream m_fileStream;
-        private volatile bool m_stop;
+        private volatile bool m_stopReadWriteLoops;
         private volatile IntPtr m_taskThreadHandle;
 
         private Exception m_lastException;
@@ -33,6 +34,8 @@ namespace RTSS_time_reader
         private bool m_writeFrapsFileFormat;
 
         private readonly object m_threadHandleLocker = new object();
+        private volatile bool m_continueAcceptingConnections;
+        public string ProcessName { get; private set; }
 
         public PipeReader()
         {
@@ -46,8 +49,11 @@ namespace RTSS_time_reader
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             protected set
             {
+                var oldState = m_state;
                 m_state = value;
-                OnStateChanged();
+
+                if ((oldState & ~PipeReaderState.PipeIO) != (m_state & ~PipeReaderState.PipeIO))
+                    OnStateChanged();
             }
         }
 
@@ -97,7 +103,7 @@ namespace RTSS_time_reader
 
         public void Stop ()
         {
-            m_stop = true;
+            m_stopReadWriteLoops = true;
             ClosePipe();
         }
 
@@ -149,8 +155,20 @@ namespace RTSS_time_reader
         public bool EnabledWritingFile
         {
             get { return ReadFlag(PipeReaderState.EnabledWritingFile); }
-            set { SetFlag(PipeReaderState.EnabledWritingFile, value); }
+            set
+            {
+                lock (m_fileStreamLocker)
+                {
+                    SetFlag(PipeReaderState.EnabledWritingFile, value);
+
+                    if ((false == value) && IsFileOpened)
+                        CloseFile();
+                }
+            }
         }
+
+        public string OpenedFileName { get; protected set; }
+        public string TargetFolder { get; set; }
 
         public void StartAcceptingConnections()
         {
@@ -158,7 +176,7 @@ namespace RTSS_time_reader
             ClientProcessId = Win32A.INVALID_HANDLE_VALUE;
 
             var previousTask = m_task;
-            m_stop = false;
+            m_stopReadWriteLoops = false;
 
             m_task = Task.Factory.StartNew(
                 () =>
@@ -192,7 +210,7 @@ namespace RTSS_time_reader
 
                         SetFlag(PipeReaderState.FileOpened, true);
 
-                        WritingFileLoop();
+                        MainLoop();
                     }
                     finally
                     {
@@ -201,11 +219,11 @@ namespace RTSS_time_reader
                             if (m_taskThreadHandle != Win32A.INVALID_HANDLE_PTR)
                             {
                                 Win32A.CloseHandle(m_taskThreadHandle);
-                                m_taskThreadHandle = Win32A.INVALID_HANDLE_PTR;
                             }
+                            m_taskThreadHandle = Win32A.INVALID_HANDLE_PTR;
+                            m_task = null;
                         }
 
-                        m_task = null;
                         State = PipeReaderState.None;
                     }
                 }
@@ -216,18 +234,22 @@ namespace RTSS_time_reader
         }
 
 
-      
         private bool OpenFile()
         {
             try
             {
-                var name = Path.GetFileNameWithoutExtension(m_StartFileName);
+                var name = Path.GetFileNameWithoutExtension(m_StartFileName) + "_" + ProcessName;
                 var extension = Path.GetExtension(m_StartFileName);
-                var newFileName = name + "." + m_fileNumber.ToString("D2") + "." + extension;
+                var newFileName = name + "." + m_fileNumber.ToString("D2") +  extension;
+                var fullPath = Path.Combine(this.TargetFolder, newFileName);
+
                 lock (m_fileStreamLocker)
                 {
-                    m_fileStream = File.Open(newFileName, FileMode.Create, FileAccess.Write, FileShare.Read);
+                    m_fileStream = File.Open(fullPath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                    SetFlag(PipeReaderState.FileOpened, true);
                     ++m_fileNumber;
+                    OpenedFileName = newFileName;
+                    WriteFileHeader();
                 }
             }
             catch (Exception exception)
@@ -266,34 +288,14 @@ namespace RTSS_time_reader
                     }
                 }
 
-                SetFlag(PipeReaderState.PipeCreated, true);
-
-
                 var safePipeHandle = new SafePipeHandle(handle, true);
-
                 m_pipeStream = new NamedPipeServerStream(PipeDirection.InOut, false, false, safePipeHandle);
+                SetFlag(PipeReaderState.PipeCreated, true);
 
                 m_lastException = null;
 
-                SetFlag(PipeReaderState.PipeIO, true);
-                try
-                {
-                    m_pipeStream.WaitForConnection();
-                }
-                finally
-                {
-                    SetFlag(PipeReaderState.PipeIO, false);
-                }
-
                 result = true;
-                SetFlag(PipeReaderState.ConnectionAccepted, true);
-
-
-                uint processId;
-                if (Win32A.GetNamedPipeClientProcessId(handle, out processId))
-                {
-                    ClientProcessId = processId;
-                }
+                WaitForConnection();
             }
             catch (TimeoutException exception)
             {
@@ -313,17 +315,40 @@ namespace RTSS_time_reader
             return result;
         }
 
+        private void WaitForConnection()
+        {
+            SetFlag(PipeReaderState.PipeIO, true);
+            try
+            {
+                m_pipeStream.WaitForConnection();
 
-        private void WritingFileLoop()
+                uint processId;
+                if (Win32A.GetNamedPipeClientProcessId(m_pipeStream.SafePipeHandle.DangerousGetHandle(), out processId))
+                {
+                    ClientProcessId = processId;
+
+                    using (var process = Process.GetProcessById((int) ClientProcessId))
+                    {
+                        ProcessName = process.ProcessName;
+                    }
+                }
+            }
+            finally
+            {
+                SetFlag(PipeReaderState.PipeIO, false);
+            }
+            SetFlag(PipeReaderState.ConnectionAccepted, true);
+        }
+
+
+        private void MainLoop()
         {
             var numberFormat = (NumberFormatInfo) CultureInfo.CurrentCulture.NumberFormat.Clone();
             numberFormat.NumberDecimalSeparator = ".";
             numberFormat.NumberDecimalDigits = 3;
 
-            WriteFileHeader();
-
             const int sizeValueString = 11;
-            uint frameNumber = 1;
+            uint frameNumber = 0;
             uint totalTime = 0;
             var firstPass = true;
             var totalTimeSb = new StringBuilder(sizeValueString);
@@ -333,107 +358,173 @@ namespace RTSS_time_reader
             {
                 bufferSize = sizeof(FRAMETIME_PIPE_DATA);
             }
-            var buffer = new byte[bufferSize];
 
-            try
+            var buffer = new byte[bufferSize];
+            do //while (ContinueAcceptingConnections);
             {
                 try
                 {
-                    unsafe
+                    try
                     {
-                        fixed (void* rowData = buffer)
-                            while (false == m_stop)
-                            {
-                                int readedCount;
-                                lock (m_pipeStreamLocker)
+                        unsafe
+                        {
+                            fixed (void* rowData = buffer)
+                                while (false == m_stopReadWriteLoops)
                                 {
-                                    SetFlag(PipeReaderState.PipeIO, true);
-                                    readedCount = m_pipeStream.Read(buffer, 0, bufferSize);
-                                    SetFlag(PipeReaderState.PipeIO, false);
-                                }
-
-                                if (readedCount == 0)
-                                    break;
-
-                                if (false == EnabledWritingFile)
-                                    continue;
-
-                                ++frameNumber;
-
-                                var ppipeData = (FRAMETIME_PIPE_DATA*) rowData;
-                                var delta = ppipeData->dwFrametime;
-
-
-                                string strValue;
-
-                                if (false == m_writeFrapsFileFormat)
-                                {
-                                    strValue = string.Empty;
-
-                                    if (false == firstPass)
+                                    int readedCount;
+                                    lock (m_pipeStreamLocker)
                                     {
-                                        strValue = ", ";
+                                        SetFlag(PipeReaderState.PipeIO, true);
+                                        try
+                                        {
+                                            readedCount = m_pipeStream.Read(buffer, 0, bufferSize);
+                                        }
+                                        finally
+                                        {
+                                            SetFlag(PipeReaderState.PipeIO, false);
+                                        }
+                                    }
+
+                                    if (readedCount == 0)
+                                        break;
+
+                                    if (m_stopReadWriteLoops)
+                                        break;
+
+                                    if (false == EnabledWritingFile)
+                                        continue;
+
+                                    ++frameNumber;
+
+                                    var ppipeData = (FRAMETIME_PIPE_DATA*) rowData;
+                                    var delta = ppipeData->dwFrametime;
+
+
+                                    string strValue;
+
+                                    if (false == m_writeFrapsFileFormat)
+                                    {
+                                        strValue = string.Empty;
+
+                                        if (false == firstPass)
+                                        {
+                                            strValue = ", ";
+                                        }
+                                        else
+                                        {
+                                            firstPass = false;
+                                        }
+
+                                        strValue += ((float) delta / 1000).ToString(numberFormat);
                                     }
                                     else
                                     {
-                                        firstPass = false;
+                                        totalTime += delta;
+
+                                        strValue = frameNumber.ToString("D5").ReplaceInplaceLeadingChars('0', ' ');
+                                        strValue += ",";
+
+                                        var totalTimeString = ((float) totalTime / 1000.0).ToString(numberFormat);
+                                        if (totalTimeString.Length < sizeValueString)
+                                        {
+                                            totalTimeString = totalTimeSb
+                                                .Append(' ', sizeValueString - totalTimeString.Length)
+                                                .Append(totalTimeString)
+                                                .Append(Environment.NewLine)
+                                                .ToString();
+                                            totalTimeSb.Clear();
+                                        }
+
+                                        strValue += totalTimeString;
                                     }
 
-                                    strValue += ((float) delta / 1000).ToString(numberFormat);
-                                }
-                                else
-                                {
-                                    totalTime += delta;
 
-                                    strValue = frameNumber.ToString("D5").ReplaceInplaceLeadingChars('0', ' ');
-                                    strValue += ",";
-
-                                    var totalTimeString = ((float) totalTime / 1000.0).ToString(numberFormat);
-                                    if (totalTimeString.Length < sizeValueString)
+                                    var stringBytes = Encoding.ASCII.GetBytes(strValue);
+                                    lock (m_fileStreamLocker)
                                     {
-                                        totalTimeString = totalTimeSb
-                                            .Append(' ', sizeValueString - totalTimeString.Length)
-                                            .Append(totalTimeString)
-                                            .Append(Environment.NewLine)
-                                            .ToString();
-                                        totalTimeSb.Clear();
+                                        if (m_fileStream != null)
+                                            m_fileStream.Write(stringBytes, 0, stringBytes.Length);
+                                        else
+                                        {
+                                            OpenFile();
+
+                                            frameNumber = 0;
+                                            totalTime = 0;
+                                            firstPass = true;
+                                        }
                                     }
-
-                                    strValue += totalTimeString;
                                 }
+                        }
+                    }
+                    catch (System.OperationCanceledException)
+                    {
 
-
-                                var stringBytes = Encoding.ASCII.GetBytes(strValue);
-                                lock (m_fileStreamLocker)
-                                {
-                                    m_fileStream.Write(stringBytes, 0, stringBytes.Length);
-                                }
-                            }
+                    }
+                    catch (Exception exception)
+                    {
+                        m_lastException = exception;
+                        SetFlag(PipeReaderState.Error, true);
                     }
                 }
-                catch (System.OperationCanceledException)
+                finally
                 {
+                    SetFlag(PipeReaderState.PipeIO, false);
+                    CloseFile();
 
+                    lock (m_pipeStream)
+                    {
+                        if (m_pipeStream != null)
+                            m_pipeStream.Disconnect();
+                    }
+                    SetFlag(PipeReaderState.ConnectionAccepted,false);
+
+                    if (false == ContinueAcceptingConnections)
+                    {
+                        ClosePipe();
+                    }
                 }
-                catch (Exception exception)
+
+
+                if (false == ContinueAcceptingConnections)
+                    return;
+
+                lock (m_pipeStreamLocker)
                 {
-                    m_lastException = exception;
-                    SetFlag(PipeReaderState.Error, true);
+                    try
+                    {
+                        WaitForConnection();
+                        OpenFile();
+                    }
+                    catch (OperationCanceledException exception)
+                    {
+                        return;
+                    }
+                    catch (Exception exception)
+                    {
+                        m_lastException = exception;
+                        SetFlag(PipeReaderState.Error, true);
+                    }
+
+                    frameNumber = 0;
+                    totalTime = 0;
+                    firstPass = true;
+
+                    m_stopReadWriteLoops = false;
                 }
-            }
-            finally
-            {
-                SetFlag(PipeReaderState.PipeIO, false);
-                CloseFile();
-                ClosePipe();
-            }
+            } while (ContinueAcceptingConnections);
+        }
+
+        public bool ContinueAcceptingConnections
+        {
+            get { return m_continueAcceptingConnections; }
+            set { m_continueAcceptingConnections = value; }
         }
 
         private void WriteFileHeader()
         {
             if (m_writeFrapsFileFormat)
             {
-                var headerLine = "Frame, Time(ms)" + Environment.NewLine + "    1,     0.000" + Environment.NewLine;
+                var headerLine = "Frame, Time(ms)"+Environment.NewLine;
 
                 var stringBytes = Encoding.ASCII.GetBytes(headerLine);
                 m_fileStream.Write(stringBytes, 0, stringBytes.Length);
@@ -442,21 +533,20 @@ namespace RTSS_time_reader
 
         protected void ClosePipe()
         {
-            if (m_pipeStream != null)
+            ContinueAcceptingConnections = false;
+            
+            lock (m_threadHandleLocker)
             {
-                lock (m_threadHandleLocker)
-                {
-                    if (ReadFlag(PipeReaderState.PipeIO) && m_taskThreadHandle != Win32A.INVALID_HANDLE_PTR)
-                        Win32A.CancelSynchronousIo(m_taskThreadHandle);
-                }
+                if (ReadFlag(PipeReaderState.PipeIO) && m_taskThreadHandle != Win32A.INVALID_HANDLE_PTR)
+                    Win32A.CancelSynchronousIo(m_taskThreadHandle);
+            }
 
-                lock (m_pipeStreamLocker)
+            lock (m_pipeStreamLocker)
+            {
+                if (m_pipeStream != null)
                 {
-                    if (m_pipeStream != null)
-                    {
-                        m_pipeStream.Dispose();
-                        m_pipeStream = null;
-                    }
+                    m_pipeStream.Dispose();
+                    m_pipeStream = null;
                 }
             }
 
@@ -470,7 +560,6 @@ namespace RTSS_time_reader
             {
                 if (m_fileStream != null)
                 {
-                    m_fileStream.Flush(true);
                     m_fileStream.Close();
                     m_fileStream = null;
                 }
@@ -490,7 +579,7 @@ namespace RTSS_time_reader
 
         public void Dispose()
         {
-            m_stop = true;
+            m_stopReadWriteLoops = true;
             m_pipeStream?.Dispose();
             lock (m_fileStreamLocker)
             {
@@ -510,6 +599,19 @@ namespace RTSS_time_reader
             {
                 EnabledWritingFile = false;
                 CloseFile();
+            }
+        }
+
+        public void DropConnection()
+        {
+            if (false == IsConnectionAccepted)
+                throw new InvalidOperationException("Invalid object state");
+
+            m_stopReadWriteLoops = true;
+            lock (m_threadHandleLocker)
+            {
+                if (ReadFlag(PipeReaderState.PipeIO) && m_taskThreadHandle != Win32A.INVALID_HANDLE_PTR)
+                    Win32A.CancelSynchronousIo(m_taskThreadHandle);
             }
         }
     }
