@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -20,8 +21,14 @@ namespace RTSS_time_reader
 
         private Exception m_lastException;
         private volatile Task m_task;
-        private string m_fileName;
-        private PipeReaderState m_state;
+
+        private string m_StartFileName;
+        private int m_fileNumber;
+        private object m_fileStreamLocker = new object();
+        private object m_pipeStreamLocker = new object();
+
+
+        private volatile PipeReaderState m_state;
         private string m_pipeName;
         private bool m_writeFrapsFileFormat;
 
@@ -33,7 +40,10 @@ namespace RTSS_time_reader
 
         public PipeReaderState State
         {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return m_state; }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             protected set
             {
                 m_state = value;
@@ -43,42 +53,44 @@ namespace RTSS_time_reader
 
         public event EventHandler StateChanged;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ReadFlag(PipeReaderState p_flag)
         {
             return (m_state & p_flag) != 0;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void SetFlag(PipeReaderState p_flag, bool p_value)
         {
             if (p_value)
-                m_state |= p_flag;
+                State = m_state | p_flag;
             else
-                m_state &= ~p_flag;
+                State = m_state & ~p_flag;
         }
 
         public bool IsStarted
         {
-            get { return (State & PipeReaderState.Started) != 0; }
+            get { return ReadFlag(PipeReaderState.Started); }
         }
 
         public bool IsPipeCreated
         {
-            get { return (State & PipeReaderState.PipeCreated) != 0; }
+            get { return ReadFlag(PipeReaderState.PipeCreated); }
         }
 
         public bool IsFileOpened
         {
-            get { return (State & PipeReaderState.FileOpened) != 0; }
+            get { return ReadFlag(PipeReaderState.FileOpened); }
         }
 
         public bool IsConnectionAccepted
         {
-            get { return (State & PipeReaderState.ConnectionAccepted) != 0; }
+            get { return ReadFlag(PipeReaderState.ConnectionAccepted); }
         }
 
         public bool IsError
         {
-            get { return (State & PipeReaderState.Error) != 0; }
+            get { return ReadFlag(PipeReaderState.Error); }
         }
 
         public uint ClientProcessId { get; protected set; }
@@ -94,14 +106,14 @@ namespace RTSS_time_reader
             get { return m_lastException; }
         }
 
-        public string FileName
+        public string StartFileName
         {
-            get { return m_fileName; }
+            get { return m_StartFileName; }
             set
             {
                 if (IsFileOpened)
                     throw new InvalidOperationException("invalid object state");
-                m_fileName = value;
+                m_StartFileName = value;
             }
        }
 
@@ -134,9 +146,15 @@ namespace RTSS_time_reader
             }
         }
 
+        public bool EnabledWritingFile
+        {
+            get { return ReadFlag(PipeReaderState.EnabledWritingFile); }
+            set { SetFlag(PipeReaderState.EnabledWritingFile, value); }
+        }
+
         public void StartAcceptingConnections()
         {
-            State = PipeReaderState.Started;
+            SetFlag(PipeReaderState.Started, true);
             ClientProcessId = Win32A.INVALID_HANDLE_VALUE;
 
             var previousTask = m_task;
@@ -172,7 +190,7 @@ namespace RTSS_time_reader
                             return;
                         }
 
-                        State |= PipeReaderState.FileOpened;
+                        SetFlag(PipeReaderState.FileOpened, true);
 
                         WritingFileLoop();
                     }
@@ -203,12 +221,19 @@ namespace RTSS_time_reader
         {
             try
             {
-                m_fileStream = File.Open(m_fileName, FileMode.Create, FileAccess.Write, FileShare.Read);
+                var name = Path.GetFileNameWithoutExtension(m_StartFileName);
+                var extension = Path.GetExtension(m_StartFileName);
+                var newFileName = name + "." + m_fileNumber.ToString("D2") + "." + extension;
+                lock (m_fileStreamLocker)
+                {
+                    m_fileStream = File.Open(newFileName, FileMode.Create, FileAccess.Write, FileShare.Read);
+                    ++m_fileNumber;
+                }
             }
             catch (Exception exception)
             {
                 m_lastException = exception;
-                State |= PipeReaderState.Error;
+                SetFlag(PipeReaderState.Error, true);
                 return false;
             }
             return true;
@@ -241,8 +266,7 @@ namespace RTSS_time_reader
                     }
                 }
 
-                State |= PipeReaderState.PipeCreated;
-
+                SetFlag(PipeReaderState.PipeCreated, true);
 
 
                 var safePipeHandle = new SafePipeHandle(handle, true);
@@ -262,7 +286,7 @@ namespace RTSS_time_reader
                 }
 
                 result = true;
-                State |= PipeReaderState.ConnectionAccepted;
+                SetFlag(PipeReaderState.ConnectionAccepted, true);
 
 
                 uint processId;
@@ -274,7 +298,7 @@ namespace RTSS_time_reader
             catch (TimeoutException exception)
             {
                 m_lastException = exception;
-                State |= PipeReaderState.Error;
+                SetFlag(PipeReaderState.Error, true);
             }
             catch (System.OperationCanceledException)
             {
@@ -282,8 +306,8 @@ namespace RTSS_time_reader
             catch (Exception exception)
             {
                 m_lastException = exception;
-                State |= PipeReaderState.Error;
                 ClosePipe();
+                SetFlag(PipeReaderState.Error, true);
             }
 
             return result;
@@ -296,13 +320,7 @@ namespace RTSS_time_reader
             numberFormat.NumberDecimalSeparator = ".";
             numberFormat.NumberDecimalDigits = 3;
 
-            if (m_writeFrapsFileFormat)
-            {
-                var headerLine = "Frame, Time(ms)" + Environment.NewLine + "    1,     0.000" + Environment.NewLine;
-
-                var stringBytes = Encoding.ASCII.GetBytes(headerLine);
-                m_fileStream.Write(stringBytes, 0, stringBytes.Length);
-            }
+            WriteFileHeader();
 
             const int sizeValueString = 11;
             uint frameNumber = 1;
@@ -327,7 +345,7 @@ namespace RTSS_time_reader
                             while (false == m_stop)
                             {
                                 int readedCount;
-                                lock (m_pipeStream)
+                                lock (m_pipeStreamLocker)
                                 {
                                     SetFlag(PipeReaderState.PipeIO, true);
                                     readedCount = m_pipeStream.Read(buffer, 0, bufferSize);
@@ -336,6 +354,9 @@ namespace RTSS_time_reader
 
                                 if (readedCount == 0)
                                     break;
+
+                                if (false == EnabledWritingFile)
+                                    continue;
 
                                 ++frameNumber;
 
@@ -383,7 +404,10 @@ namespace RTSS_time_reader
 
 
                                 var stringBytes = Encoding.ASCII.GetBytes(strValue);
-                                m_fileStream.Write(stringBytes, 0, stringBytes.Length);
+                                lock (m_fileStreamLocker)
+                                {
+                                    m_fileStream.Write(stringBytes, 0, stringBytes.Length);
+                                }
                             }
                     }
                 }
@@ -394,7 +418,7 @@ namespace RTSS_time_reader
                 catch (Exception exception)
                 {
                     m_lastException = exception;
-                    State |= PipeReaderState.Error;
+                    SetFlag(PipeReaderState.Error, true);
                 }
             }
             finally
@@ -402,6 +426,17 @@ namespace RTSS_time_reader
                 SetFlag(PipeReaderState.PipeIO, false);
                 CloseFile();
                 ClosePipe();
+            }
+        }
+
+        private void WriteFileHeader()
+        {
+            if (m_writeFrapsFileFormat)
+            {
+                var headerLine = "Frame, Time(ms)" + Environment.NewLine + "    1,     0.000" + Environment.NewLine;
+
+                var stringBytes = Encoding.ASCII.GetBytes(headerLine);
+                m_fileStream.Write(stringBytes, 0, stringBytes.Length);
             }
         }
 
@@ -415,27 +450,33 @@ namespace RTSS_time_reader
                         Win32A.CancelSynchronousIo(m_taskThreadHandle);
                 }
 
-                lock (m_pipeStream)
+                lock (m_pipeStreamLocker)
                 {
-                    m_pipeStream.Dispose();
-                    m_pipeStream = null;
+                    if (m_pipeStream != null)
+                    {
+                        m_pipeStream.Dispose();
+                        m_pipeStream = null;
+                    }
                 }
             }
 
-            State &= ~PipeReaderState.ConnectionAccepted;
-            State &= ~PipeReaderState.PipeCreated;
+            SetFlag(PipeReaderState.ConnectionAccepted, false);
+            SetFlag(PipeReaderState.PipeCreated, false);
         }
 
         protected void CloseFile()
         {
-            if (m_fileStream != null)
+            lock (m_fileStreamLocker)
             {
-                m_fileStream.Flush(true);
-                m_fileStream.Close();
-                m_fileStream = null;
+                if (m_fileStream != null)
+                {
+                    m_fileStream.Flush(true);
+                    m_fileStream.Close();
+                    m_fileStream = null;
+                }
             }
 
-            State &= ~PipeReaderState.FileOpened;
+            SetFlag(PipeReaderState.FileOpened, false);
         }
 
         protected void OnStateChanged()
@@ -451,13 +492,25 @@ namespace RTSS_time_reader
         {
             m_stop = true;
             m_pipeStream?.Dispose();
-            m_fileStream?.Dispose();
+            lock (m_fileStreamLocker)
+            {
+                m_fileStream?.Dispose();
+            }
         }
 
         public void FlushFileBuffer()
         {
             if (m_fileStream != null)
                 m_fileStream.Flush(true);
+        }
+
+        public void StopWritingFile()
+        {
+            lock (m_fileStreamLocker)
+            {
+                EnabledWritingFile = false;
+                CloseFile();
+            }
         }
     }
 }

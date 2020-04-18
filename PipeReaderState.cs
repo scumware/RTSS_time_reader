@@ -18,5 +18,7 @@ namespace RTSS_time_reader
         Error = 16
         ,
         PipeIO = 32
+        ,
+        EnabledWritingFile = 64
     }
 }

@@ -114,39 +114,6 @@ namespace RTSS_time_reader
             MOD_NOREPEAT = 0x4000
         }
 
-        public static string GetDescription(this KeyModifiers p_value)
-        {
-            if (p_value == KeyModifiers.None)
-                return p_value.ToString();
-
-            var result = string.Empty;
-            var firstMod = true;
-
-            result += Result(p_value, KeyModifiers.Ctrl, ref firstMod);
-            result += Result(p_value, KeyModifiers.Alt, ref firstMod);
-            result += Result(p_value, KeyModifiers.Shift, ref firstMod);
-            result += Result(p_value, KeyModifiers.Win, ref firstMod);
-
-            return result;
-        }
-
-        private static string Result(KeyModifiers p_value, KeyModifiers modifier, ref bool firstMod)
-        {
-            string result = string.Empty;
-
-            if ((p_value & modifier) != 0)
-            {
-                if (firstMod)
-                    result += modifier;
-                else
-                    result += "+" + modifier;
-
-                firstMod = false;
-            }
-
-            return result;
-        }
-
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern ushort GlobalAddAtom(string lpString);
 

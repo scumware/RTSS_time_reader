@@ -202,27 +202,6 @@ namespace RTSS_time_reader
             else
                 txtHotkeyEditor.Text = NewKeyModifiers.GetDescription();
         }
-/*
-        private void DebugPrint(Message p_message, Keys key)
-        {
-            Win32A.WindowsMessages msg = (Win32A.WindowsMessages)p_message.Msg;
-
-            Debug.Print(msg + "_key: " + key);
-            Debug.Print(msg + "_lparam: " + p_message.LParam.ToInt32().ToString("X8"));
-
-            int scanCode = (p_message.LParam.ToInt32() >> 16) & 0xff;
-            Debug.Print(msg + "_scancode: " + scanCode.ToString("X8"));
-
-            Debug.Print("allPressed: " + NewHotkey);
-
-            /*
-                    var sb = new StringBuilder(32);
-                    Win32A.GetKeyNameText(p_message.LParam.ToInt32(), sb, sb.Capacity);
-                    Debug.Print(sb.ToString());
-             
-             -/
-        }
-*/
 
         private static Keys GetVkKey(Message p_message)
         {

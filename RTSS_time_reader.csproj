@@ -54,6 +54,7 @@
     <Compile Include="HotkeyEditorDialog.Designer.cs">
       <DependentUpon>HotkeyEditorDialog.cs</DependentUpon>
     </Compile>
+    <Compile Include="HotkeyHelper.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
