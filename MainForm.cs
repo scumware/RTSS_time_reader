@@ -23,9 +23,18 @@ namespace RTSS_time_reader
         private readonly System.Timers.Timer m_flushFileTimer;
 
         private ushort? m_globalHotkeyAtom;
-        private int? m_startStopWritingHotkeyId;
-        private Keys? m_registredHotkey;
-        private Win32A.KeyModifiers? m_registredHotkeyModifiers;
+
+        public Hotkey? RegistredHotkey
+        {
+            get { return m_registredHotkey; }
+            private set
+            {
+                m_registredHotkey = value;
+                if (value.HasValue)
+                    txtHotkeyEditor.Text = value.Value.Modifiers.GetDescription() + "+" + value.Value.Key;
+            }
+        }
+
         private bool m_previousStateIsError = false;
         private TimeSpan m_remainedTimeSpan;
         private TimeSpan m_flushTimerPeriod;
@@ -88,30 +97,31 @@ namespace RTSS_time_reader
         {
             base.OnShown(e);
 
-            m_globalHotkeyAtom = Win32A.GlobalAddAtom("RTSS_READER_HOTKEYs");
-            var keyModifiers = Win32A.KeyModifiers.Alt | Win32A.KeyModifiers.Ctrl;
-            var key = Keys.NumLock;
+            var hotkey = new Hotkey(Win32A.KeyModifiers.Alt | Win32A.KeyModifiers.Ctrl, Keys.NumLock);
 
-            var registered = RegisterHotkey(m_globalHotkeyAtom.Value, keyModifiers, key);
+            var registered = RegisterHotkey(m_globalHotkeyAtom.Value, hotkey);
             if (registered)
-                txtHotkeyEditor.Text = keyModifiers.GetDescription() + "+" + key;
+            {
+                RegistredHotkey = hotkey;
+            }
             else
+            {
                 txtHotkeyEditor.Text = Win32A.KeyModifiers.None.ToString();
+                if (m_globalHotkeyAtom.HasValue)
+                {
+                    Win32A.GlobalDeleteAtom(m_globalHotkeyAtom.Value);
+                    m_globalHotkeyAtom = null;
+                }
+            }
 
             UpdateStatus();
             StartListening();
         }
 
-        public bool RegisterHotkey(ushort atom, Win32A.KeyModifiers keyModifiers, Keys key)
+        public bool RegisterHotkey(ushort p_atom, Hotkey p_hotkey)
         {
-            var result = Win32A.RegisterHotKey(this.Handle, atom, keyModifiers, (int) Keys.NumLock);
-            if (result)
-            {
-                m_registredHotkeyModifiers = keyModifiers;
-                m_registredHotkey = key;
-                m_globalHotkeyAtom = atom;
-            }
-            else
+            var result = Win32A.RegisterHotKey(this.Handle, p_atom, p_hotkey.Modifiers, (int) p_hotkey.Key);
+            if (false == result)
             {
                 var win32Error = Marshal.GetLastWin32Error();
                 if (win32Error != Win32A.ERROR_SUCCESS)
@@ -125,14 +135,23 @@ namespace RTSS_time_reader
             return result;
         }
 
+        public void UnregisterHotkey(ushort? p_atom)
+        {
+            if (p_atom.HasValue)
+            {
+                var atom = p_atom.Value;
+
+                Win32A.UnregisterHotKey(this.Handle, atom);
+                Win32A.GlobalDeleteAtom(atom);
+            }
+        }
+
         protected override void OnClosing(CancelEventArgs e)
         {
             base.OnClosing(e);
 
-            if (m_globalHotkeyAtom.HasValue)
-            {
-                Win32A.GlobalDeleteAtom(m_globalHotkeyAtom.Value);
-            }
+            UnregisterHotkey(m_globalHotkeyAtom);
+
             m_pipeReader.Dispose();
         }
 
@@ -171,16 +190,16 @@ namespace RTSS_time_reader
         private void txtHotkeyEditor_Enter(object sender, EventArgs e)
         {
             var dialog = new HotkeyEditorDialog();
-            dialog.Atom = m_globalHotkeyAtom;
-            dialog.RegistredHotkeyModifiers = m_registredHotkeyModifiers;
-            dialog.RegistredHotkey = m_registredHotkey;
-            dialog.RegistredHotkeyId = m_startStopWritingHotkeyId;
+
+            dialog.RegistredHotkey = RegistredHotkey; 
+
             dialog.HotkeyProcessor = this;
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
-                if (m_startStopWritingHotkeyId.HasValue)
+                if (m_globalHotkeyAtom.HasValue)
                 {
-                    Win32A.UnregisterHotKey(this.Handle, m_startStopWritingHotkeyId.Value);
+                    Win32A.UnregisterHotKey(this.Handle, m_globalHotkeyAtom.Value);
+
                     var win32Error = Marshal.GetLastWin32Error();
                     if (win32Error != Win32A.ERROR_SUCCESS)
                     {
@@ -190,8 +209,8 @@ namespace RTSS_time_reader
                     }
                 }
 
-                m_startStopWritingHotkeyId = dialog.RegistredHotkeyId;
-                m_registredHotkey = dialog.RegistredHotkey;
+                RegistredHotkey = dialog.NewHotkey;
+                m_globalHotkeyAtom = dialog.NewHotkeyAtom;
             }
 
             this.ActiveControl = null;
@@ -209,6 +228,7 @@ namespace RTSS_time_reader
 
         private PipeReaderState m_previousPipeReaderState;
         private bool m_lblWritingFileVisible;
+        private Hotkey? m_registredHotkey;
 
         public void UpdateStatus()
         {
