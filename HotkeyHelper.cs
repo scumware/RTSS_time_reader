@@ -1,4 +1,7 @@
-﻿namespace RTSS_time_reader
+﻿using System.Text;
+using System.Windows.Forms;
+
+namespace RTSS_time_reader
 {
     public static class HotkeyHelper
     {
@@ -33,6 +36,31 @@
             }
 
             return result;
+        }
+    }
+
+    public struct Hotkey
+    {
+        public Hotkey(Win32A.KeyModifiers p_modifiers, Keys p_key)
+        {
+            Modifiers = p_modifiers;
+            Key = p_key;
+        }
+        public Win32A.KeyModifiers Modifiers;
+        public System.Windows.Forms.Keys Key;
+
+        public bool IsEmpty
+        {
+            get { return (Modifiers == Win32A.KeyModifiers.None) && (Key == Keys.None); }
+        }
+
+        public static bool operator ==(Hotkey p_left, Hotkey p_right)
+        {
+            return (p_left.Key == p_right.Key) && (p_left.Modifiers == p_right.Modifiers);
+        }
+        public static bool operator !=(Hotkey p_left, Hotkey p_right)
+        {
+            return false == (p_left == p_right);
         }
     }
 }

@@ -135,7 +135,10 @@ namespace RTSS_time_reader
             WM_CHAR  = 0x0102
         }
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true, ExactSpelling = true)]
+        public static extern bool GetKeyboardState(byte[] lpKeyState);
+
+        [DllImport("user32.dll", SetLastError = true, ExactSpelling = true)]
         public static extern int GetKeyNameText(int lParam, [Out] StringBuilder lpString,
             int nSize);
     }
