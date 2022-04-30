@@ -7,18 +7,22 @@ namespace RTSS_time_reader
     {
         None = 0
         ,
-        Started = 1
+        Starting            = 1 << 0
         ,
-        FileOpened = 2
+        Started             = 1 << 1
         ,
-        PipeCreated = 4
+        FileOpening         = 1 << 2
         ,
-        ConnectionAccepted = 8
+        FileOpened          = 1 << 3
         ,
-        Error = 16
+        PipeCreated         = 1 << 4
         ,
-        PipeIO = 32
+        ConnectionAccepted  = 1 << 5
         ,
-        EnabledWritingFile = 64
+        Error               = 1 << 6
+        ,
+        PipeIO              = 1 << 7
+        ,
+        EnabledWritingFile  = 1 << 8
     }
 }
