@@ -23,10 +23,10 @@ namespace RTSS_time_reader
         private Exception m_lastException;
         private volatile Task m_task;
 
-        private string m_StartFileName;
+        private string m_startFileName;
         private int m_fileNumber;
-        private object m_fileStreamLocker = new object();
-        private object m_pipeStreamLocker = new object();
+        private readonly object m_fileStreamLocker = new object();
+        private readonly object m_pipeStreamLocker = new object();
 
 
         private volatile PipeReaderState m_state;
@@ -35,6 +35,7 @@ namespace RTSS_time_reader
 
         private readonly object m_threadHandleLocker = new object();
         private volatile bool m_continueAcceptingConnections;
+        private Process m_connectedProcess;
         public string ProcessName { get; private set; }
 
         public PipeReader()
@@ -76,7 +77,10 @@ namespace RTSS_time_reader
 
         public bool IsStarted
         {
-            get { return ReadFlag(PipeReaderState.Started); }
+            get
+            {
+                return ReadFlag(PipeReaderState.Starting)||ReadFlag(PipeReaderState.Started);
+            }
         }
 
         public bool IsPipeCreated
@@ -87,6 +91,11 @@ namespace RTSS_time_reader
         public bool IsFileOpened
         {
             get { return ReadFlag(PipeReaderState.FileOpened); }
+        }
+
+        public bool IsFileOpening
+        {
+            get { return ReadFlag(PipeReaderState.FileOpening); }
         }
 
         public bool IsConnectionAccepted
@@ -114,12 +123,12 @@ namespace RTSS_time_reader
 
         public string StartFileName
         {
-            get { return m_StartFileName; }
+            get { return m_startFileName; }
             set
             {
                 if (IsFileOpened)
                     throw new InvalidOperationException("invalid object state");
-                m_StartFileName = value;
+                m_startFileName = value;
             }
        }
 
@@ -172,7 +181,7 @@ namespace RTSS_time_reader
 
         public void StartAcceptingConnections()
         {
-            SetFlag(PipeReaderState.Started, true);
+            SetFlag(PipeReaderState.Starting, true);
             ClientProcessId = Win32A.INVALID_HANDLE_VALUE;
 
             var previousTask = m_task;
@@ -199,6 +208,8 @@ namespace RTSS_time_reader
                                 ; //do nothing
                             }
 
+                        SetFlag(PipeReaderState.Started, true);
+
                         if (false == CreatePipe())
                             return;
 
@@ -207,8 +218,6 @@ namespace RTSS_time_reader
                             ClosePipe();
                             return;
                         }
-
-                        SetFlag(PipeReaderState.FileOpened, true);
 
                         MainLoop();
                     }
@@ -238,9 +247,11 @@ namespace RTSS_time_reader
         {
             try
             {
-                var name = Path.GetFileNameWithoutExtension(m_StartFileName) + "_" + ProcessName;
-                var extension = Path.GetExtension(m_StartFileName);
-                var newFileName = name + "." + m_fileNumber.ToString("D2") +  extension;
+                SetFlag(PipeReaderState.FileOpening, true);
+
+                var name = Path.GetFileNameWithoutExtension(m_startFileName) + "_" + ProcessName;
+                var extension = Path.GetExtension(m_startFileName);
+                var newFileName = name + "." + m_fileNumber.ToString("D2") + extension;
                 var fullPath = Path.Combine(this.TargetFolder, newFileName);
 
                 lock (m_fileStreamLocker)
@@ -257,6 +268,10 @@ namespace RTSS_time_reader
                 m_lastException = exception;
                 SetFlag(PipeReaderState.Error, true);
                 return false;
+            }
+            finally
+            {
+                SetFlag(PipeReaderState.FileOpening, false);
             }
             return true;
         }
@@ -309,6 +324,7 @@ namespace RTSS_time_reader
             {
                 m_lastException = exception;
                 ClosePipe();
+                CloseConnectedProcess();
                 SetFlag(PipeReaderState.Error, true);
             }
 
@@ -327,10 +343,8 @@ namespace RTSS_time_reader
                 {
                     ClientProcessId = processId;
 
-                    using (var process = Process.GetProcessById((int) ClientProcessId))
-                    {
-                        ProcessName = process.ProcessName;
-                    }
+                    m_connectedProcess = Process.GetProcessById((int) ClientProcessId);
+                    ProcessName = m_connectedProcess.ProcessName;
                 }
             }
             finally
@@ -347,11 +361,11 @@ namespace RTSS_time_reader
             numberFormat.NumberDecimalSeparator = ".";
             numberFormat.NumberDecimalDigits = 3;
 
-            const int sizeValueString = 11;
+            const int valueStringLenght = 11;
             uint frameNumber = 0;
             uint totalTime = 0;
             var firstPass = true;
-            var totalTimeSb = new StringBuilder(sizeValueString);
+            var totalTimeSb = new StringBuilder(valueStringLenght);
 
             int bufferSize;
             unsafe
@@ -404,18 +418,25 @@ namespace RTSS_time_reader
 
                                     if (false == m_writeFrapsFileFormat)
                                     {
-                                        strValue = string.Empty;
+                                        var valuesLineStringBuilder = new StringBuilder();
 
                                         if (false == firstPass)
                                         {
-                                            strValue = ", ";
+                                            valuesLineStringBuilder.AppendLine();
                                         }
                                         else
                                         {
                                             firstPass = false;
                                         }
 
-                                        strValue += ((float) delta / 1000).ToString(numberFormat);
+                                        valuesLineStringBuilder
+                                            .Append(((float) delta / 1000).ToString(numberFormat))
+                                            .Append(",\t")
+                                            .Append(m_connectedProcess.PrivilegedProcessorTime.ToString("g"))
+                                            .Append(",\t")
+                                            .Append(m_connectedProcess.UserProcessorTime.ToString("g"));
+
+                                        strValue = valuesLineStringBuilder.ToString();
                                     }
                                     else
                                     {
@@ -425,10 +446,12 @@ namespace RTSS_time_reader
                                         strValue += ",";
 
                                         var totalTimeString = ((float) totalTime / 1000.0).ToString(numberFormat);
-                                        if (totalTimeString.Length < sizeValueString)
+                                        if (totalTimeString.Length < valueStringLenght)
                                         {
+                                            var whitespacesCount = valueStringLenght - totalTimeString.Length;
+
                                             totalTimeString = totalTimeSb
-                                                .Append(' ', sizeValueString - totalTimeString.Length)
+                                                .Append(' ', whitespacesCount)
                                                 .Append(totalTimeString)
                                                 .Append(Environment.NewLine)
                                                 .ToString();
@@ -470,6 +493,7 @@ namespace RTSS_time_reader
                 {
                     SetFlag(PipeReaderState.PipeIO, false);
                     CloseFile();
+                    CloseConnectedProcess();
 
                     lock (m_pipeStream)
                     {
@@ -522,13 +546,18 @@ namespace RTSS_time_reader
 
         private void WriteFileHeader()
         {
+            string headerLine;
             if (m_writeFrapsFileFormat)
             {
-                var headerLine = "Frame, Time(ms)"+Environment.NewLine;
-
-                var stringBytes = Encoding.ASCII.GetBytes(headerLine);
-                m_fileStream.Write(stringBytes, 0, stringBytes.Length);
+                headerLine = "Frame, Time(ms)"+Environment.NewLine;
             }
+            else
+            {
+                headerLine = "FrameTime(ms), PrivilegedProcessorTime, UserProcessorTime"  + Environment.NewLine;
+            }
+
+            var stringBytes = Encoding.ASCII.GetBytes(headerLine);
+            m_fileStream.Write(stringBytes, 0, stringBytes.Length);
         }
 
         protected void ClosePipe()
@@ -566,6 +595,16 @@ namespace RTSS_time_reader
             }
 
             SetFlag(PipeReaderState.FileOpened, false);
+        }
+
+        protected void CloseConnectedProcess()
+        {
+            if (m_connectedProcess != null)
+            {
+                m_connectedProcess.Dispose();
+                m_connectedProcess = null;
+                ProcessName = string.Empty;
+            }
         }
 
         protected void OnStateChanged()

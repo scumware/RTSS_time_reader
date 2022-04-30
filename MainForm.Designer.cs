@@ -222,6 +222,7 @@ namespace RTSS_time_reader
             this.chkFrapsFormat.TabIndex = 5;
             this.chkFrapsFormat.Text = "Write FRAPS file format";
             this.chkFrapsFormat.UseVisualStyleBackColor = true;
+            this.chkFrapsFormat.CheckedChanged += new System.EventHandler(this.chkFrapsFormat_CheckedChanged);
             // 
             // chkStartWritingImmediately
             // 
