@@ -63,7 +63,7 @@
     </Compile>
     <Compile Include="FRAMETIME_PIPE_DATA.cs" />
     <Compile Include="PipeReader.cs" />
-    <Compile Include="PipeReaderState.cs" />
+    <Compile Include="PipeReaderStateEnum.cs" />
     <Compile Include="StringExtention.cs" />
     <Compile Include="Win32A.cs" />
     <Compile Include="Program.cs" />

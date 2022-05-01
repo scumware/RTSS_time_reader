@@ -29,7 +29,7 @@ namespace RTSS_time_reader
         private readonly object m_pipeStreamLocker = new object();
 
 
-        private volatile PipeReaderState m_state;
+        private PipeReaderState m_state;
         private string m_pipeName;
         private bool m_writeFrapsFileFormat;
 
@@ -52,61 +52,27 @@ namespace RTSS_time_reader
             {
                 var oldState = m_state;
                 m_state = value;
-
-                if ((oldState & ~PipeReaderState.PipeIO) != (m_state & ~PipeReaderState.PipeIO))
+                if (m_state.GetDifference(oldState) != PipeReaderStateEnum.PipeIO)
+                {
                     OnStateChanged();
+                }
             }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetFlag(PipeReaderStateEnum p_flag, bool p_value)
+        {
+            var oldState = m_state;
+
+            var newState = oldState;
+            newState.SetFlag(p_flag, p_value);
+
+            State = newState;
+        }
+
+
 
         public event EventHandler StateChanged;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool ReadFlag(PipeReaderState p_flag)
-        {
-            return (m_state & p_flag) != 0;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void SetFlag(PipeReaderState p_flag, bool p_value)
-        {
-            if (p_value)
-                State = m_state | p_flag;
-            else
-                State = m_state & ~p_flag;
-        }
-
-        public bool IsStarted
-        {
-            get
-            {
-                return ReadFlag(PipeReaderState.Starting)||ReadFlag(PipeReaderState.Started);
-            }
-        }
-
-        public bool IsPipeCreated
-        {
-            get { return ReadFlag(PipeReaderState.PipeCreated); }
-        }
-
-        public bool IsFileOpened
-        {
-            get { return ReadFlag(PipeReaderState.FileOpened); }
-        }
-
-        public bool IsFileOpening
-        {
-            get { return ReadFlag(PipeReaderState.FileOpening); }
-        }
-
-        public bool IsConnectionAccepted
-        {
-            get { return ReadFlag(PipeReaderState.ConnectionAccepted); }
-        }
-
-        public bool IsError
-        {
-            get { return ReadFlag(PipeReaderState.Error); }
-        }
 
         public uint ClientProcessId { get; protected set; }
 
@@ -126,7 +92,7 @@ namespace RTSS_time_reader
             get { return m_startFileName; }
             set
             {
-                if (IsFileOpened)
+                if (m_state.IsFileOpened)
                     throw new InvalidOperationException("invalid object state");
                 m_startFileName = value;
             }
@@ -137,7 +103,7 @@ namespace RTSS_time_reader
             get { return m_pipeName; }
             set
             {
-                if (IsPipeCreated)
+                if (m_state.IsPipeCreated)
                     throw new InvalidOperationException("invalid object state");
 
                 m_pipeName = value;
@@ -154,7 +120,7 @@ namespace RTSS_time_reader
             get { return m_writeFrapsFileFormat; }
             set
             {
-                if (IsFileOpened)
+                if (m_state.IsFileOpened)
                     throw new InvalidOperationException("invalid object state");
 
                 m_writeFrapsFileFormat = value;
@@ -163,14 +129,14 @@ namespace RTSS_time_reader
 
         public bool EnabledWritingFile
         {
-            get { return ReadFlag(PipeReaderState.EnabledWritingFile); }
+            get { return m_state.EnabledWritingFile; }
             set
             {
                 lock (m_fileStreamLocker)
                 {
-                    SetFlag(PipeReaderState.EnabledWritingFile, value);
+                    SetFlag(PipeReaderStateEnum.EnabledWritingFile, value);
 
-                    if ((false == value) && IsFileOpened)
+                    if ((false == value) && m_state.IsFileOpened)
                         CloseFile();
                 }
             }
@@ -181,7 +147,7 @@ namespace RTSS_time_reader
 
         public void StartAcceptingConnections()
         {
-            SetFlag(PipeReaderState.Starting, true);
+            SetFlag(PipeReaderStateEnum.Starting, true);
             ClientProcessId = Win32A.INVALID_HANDLE_VALUE;
 
             var previousTask = m_task;
@@ -208,7 +174,7 @@ namespace RTSS_time_reader
                                 ; //do nothing
                             }
 
-                        SetFlag(PipeReaderState.Started, true);
+                        SetFlag(PipeReaderStateEnum.Started, true);
 
                         if (false == CreatePipe())
                             return;
@@ -247,7 +213,7 @@ namespace RTSS_time_reader
         {
             try
             {
-                SetFlag(PipeReaderState.FileOpening, true);
+                SetFlag(PipeReaderStateEnum.FileOpening, true);
 
                 var name = Path.GetFileNameWithoutExtension(m_startFileName) + "_" + ProcessName;
                 var extension = Path.GetExtension(m_startFileName);
@@ -257,7 +223,7 @@ namespace RTSS_time_reader
                 lock (m_fileStreamLocker)
                 {
                     m_fileStream = File.Open(fullPath, FileMode.Create, FileAccess.Write, FileShare.Read);
-                    SetFlag(PipeReaderState.FileOpened, true);
+                    SetFlag(PipeReaderStateEnum.FileOpened, true);
                     ++m_fileNumber;
                     OpenedFileName = newFileName;
                     WriteFileHeader();
@@ -266,12 +232,12 @@ namespace RTSS_time_reader
             catch (Exception exception)
             {
                 m_lastException = exception;
-                SetFlag(PipeReaderState.Error, true);
+                SetFlag(PipeReaderStateEnum.Error, true);
                 return false;
             }
             finally
             {
-                SetFlag(PipeReaderState.FileOpening, false);
+                SetFlag(PipeReaderStateEnum.FileOpening, false);
             }
             return true;
         }
@@ -305,7 +271,7 @@ namespace RTSS_time_reader
 
                 var safePipeHandle = new SafePipeHandle(handle, true);
                 m_pipeStream = new NamedPipeServerStream(PipeDirection.InOut, false, false, safePipeHandle);
-                SetFlag(PipeReaderState.PipeCreated, true);
+                SetFlag(PipeReaderStateEnum.PipeCreated, true);
 
                 m_lastException = null;
 
@@ -315,7 +281,7 @@ namespace RTSS_time_reader
             catch (TimeoutException exception)
             {
                 m_lastException = exception;
-                SetFlag(PipeReaderState.Error, true);
+                SetFlag(PipeReaderStateEnum.Error, true);
             }
             catch (System.OperationCanceledException)
             {
@@ -325,7 +291,7 @@ namespace RTSS_time_reader
                 m_lastException = exception;
                 ClosePipe();
                 CloseConnectedProcess();
-                SetFlag(PipeReaderState.Error, true);
+                SetFlag(PipeReaderStateEnum.Error, true);
             }
 
             return result;
@@ -333,7 +299,7 @@ namespace RTSS_time_reader
 
         private void WaitForConnection()
         {
-            SetFlag(PipeReaderState.PipeIO, true);
+            SetFlag(PipeReaderStateEnum.PipeIO, true);
             try
             {
                 m_pipeStream.WaitForConnection();
@@ -349,9 +315,9 @@ namespace RTSS_time_reader
             }
             finally
             {
-                SetFlag(PipeReaderState.PipeIO, false);
+                SetFlag(PipeReaderStateEnum.PipeIO, false);
             }
-            SetFlag(PipeReaderState.ConnectionAccepted, true);
+            SetFlag(PipeReaderStateEnum.ConnectionAccepted, true);
         }
 
 
@@ -388,14 +354,14 @@ namespace RTSS_time_reader
                                     int readedCount;
                                     lock (m_pipeStreamLocker)
                                     {
-                                        SetFlag(PipeReaderState.PipeIO, true);
+                                        SetFlag(PipeReaderStateEnum.PipeIO, true);
                                         try
                                         {
                                             readedCount = m_pipeStream.Read(buffer, 0, bufferSize);
                                         }
                                         finally
                                         {
-                                            SetFlag(PipeReaderState.PipeIO, false);
+                                            SetFlag(PipeReaderStateEnum.PipeIO, false);
                                         }
                                     }
 
@@ -486,12 +452,12 @@ namespace RTSS_time_reader
                     catch (Exception exception)
                     {
                         m_lastException = exception;
-                        SetFlag(PipeReaderState.Error, true);
+                        SetFlag(PipeReaderStateEnum.Error, true);
                     }
                 }
                 finally
                 {
-                    SetFlag(PipeReaderState.PipeIO, false);
+                    SetFlag(PipeReaderStateEnum.PipeIO, false);
                     CloseFile();
                     CloseConnectedProcess();
 
@@ -500,7 +466,7 @@ namespace RTSS_time_reader
                         if (m_pipeStream != null)
                             m_pipeStream.Disconnect();
                     }
-                    SetFlag(PipeReaderState.ConnectionAccepted,false);
+                    SetFlag(PipeReaderStateEnum.ConnectionAccepted,false);
 
                     if (false == ContinueAcceptingConnections)
                     {
@@ -526,7 +492,7 @@ namespace RTSS_time_reader
                     catch (Exception exception)
                     {
                         m_lastException = exception;
-                        SetFlag(PipeReaderState.Error, true);
+                        SetFlag(PipeReaderStateEnum.Error, true);
                     }
 
                     frameNumber = 0;
@@ -566,7 +532,7 @@ namespace RTSS_time_reader
             
             lock (m_threadHandleLocker)
             {
-                if (ReadFlag(PipeReaderState.PipeIO) && m_taskThreadHandle != Win32A.INVALID_HANDLE_PTR)
+                if (m_state.ReadFlag(PipeReaderStateEnum.PipeIO) && m_taskThreadHandle != Win32A.INVALID_HANDLE_PTR)
                     Win32A.CancelSynchronousIo(m_taskThreadHandle);
             }
 
@@ -579,8 +545,8 @@ namespace RTSS_time_reader
                 }
             }
 
-            SetFlag(PipeReaderState.ConnectionAccepted, false);
-            SetFlag(PipeReaderState.PipeCreated, false);
+            SetFlag(PipeReaderStateEnum.ConnectionAccepted, false);
+            SetFlag(PipeReaderStateEnum.PipeCreated, false);
         }
 
         protected void CloseFile()
@@ -594,7 +560,7 @@ namespace RTSS_time_reader
                 }
             }
 
-            SetFlag(PipeReaderState.FileOpened, false);
+            SetFlag(PipeReaderStateEnum.FileOpened, false);
         }
 
         protected void CloseConnectedProcess()
@@ -628,8 +594,11 @@ namespace RTSS_time_reader
 
         public void FlushFileBuffer()
         {
-            if (m_fileStream != null)
-                m_fileStream.Flush(true);
+            lock (m_fileStreamLocker)
+            {
+                if (m_fileStream != null)
+                    m_fileStream.Flush(true);
+            }
         }
 
         public void StopWritingFile()
@@ -643,13 +612,13 @@ namespace RTSS_time_reader
 
         public void DropConnection()
         {
-            if (false == IsConnectionAccepted)
+            if (false == m_state.IsConnectionAccepted)
                 throw new InvalidOperationException("Invalid object state");
 
             m_stopReadWriteLoops = true;
             lock (m_threadHandleLocker)
             {
-                if (ReadFlag(PipeReaderState.PipeIO) && m_taskThreadHandle != Win32A.INVALID_HANDLE_PTR)
+                if (m_state.ReadFlag(PipeReaderStateEnum.PipeIO) && m_taskThreadHandle != Win32A.INVALID_HANDLE_PTR)
                     Win32A.CancelSynchronousIo(m_taskThreadHandle);
             }
         }
