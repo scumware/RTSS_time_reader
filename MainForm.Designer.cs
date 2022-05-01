@@ -116,6 +116,7 @@ namespace RTSS_time_reader
             this.txtFolder.Name = "txtFolder";
             this.txtFolder.Size = new System.Drawing.Size(485, 20);
             this.txtFolder.TabIndex = 4;
+            this.txtFolder.TextChanged += new System.EventHandler(this.txtFolder_TextChanged);
             // 
             // lblPipeName
             // 

@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -36,6 +33,18 @@ namespace RTSS_time_reader
         }
 
         public bool WriteFrapsFileFormat
+        {
+            get;
+            private set;
+        }
+
+        public string TargetFolder 
+        {
+            get;
+            private set;
+        }
+
+        public string StartFileName
         {
             get;
             private set;
@@ -82,7 +91,7 @@ namespace RTSS_time_reader
 
         private void OnFlushFileTimerElapsed(object p_sender, ElapsedEventArgs p_elapsedEventArgs)
         {
-            if (m_pipeReader != null && m_pipeReader.IsConnectionAccepted && m_pipeReader.EnabledWritingFile)
+            if (m_pipeReader != null && m_pipeReader.State.IsConnectionAccepted && m_pipeReader.EnabledWritingFile)
             {
                 m_pipeReader.FlushFileBuffer();
                 Action action = () =>
@@ -165,12 +174,12 @@ namespace RTSS_time_reader
         private void btnSelectFolder_Click(object sender, EventArgs e)
         {
             System.Windows.Forms.FolderBrowserDialog dialog = new FolderBrowserDialog();
+            dialog.SelectedPath = txtFolder.Text;
+
             var dialogResult = dialog.ShowDialog();
             if (dialogResult == DialogResult.OK)
             {
                 txtFolder.Text = dialog.SelectedPath;
-                m_pipeReader.StartFileName = Path.Combine("RTSS_Values.txt");
-                m_pipeReader.TargetFolder = txtFolder.Text;
             }
         }
 
@@ -179,9 +188,11 @@ namespace RTSS_time_reader
             btnStopStart.Text = "perfomin operation...";
             btnStopStart.Enabled = false;
 
-            if (m_pipeReader.IsStarted)
+            var pipeReaderState = m_pipeReader.State;
+
+            if (pipeReaderState.IsStarted)
             {
-                if (m_pipeReader.IsConnectionAccepted)
+                if (pipeReaderState.IsConnectionAccepted)
                 {
                     m_pipeReader.ContinueAcceptingConnections = true;
                        m_pipeReader.DropConnection();
@@ -240,10 +251,16 @@ namespace RTSS_time_reader
         public void UpdateStatus()
         {
             var currentReaderState = m_pipeReader.State;
+            var newFlags = currentReaderState.GetDifference(m_previousPipeReaderState);
 
-            if (m_pipeReader.IsFileOpening)
+            if (0 != (newFlags & PipeReaderStateEnum.ConnectionAccepted))
             {
-                if (false == m_pipeReader.IsFileOpened)
+                m_pipeReader.TargetFolder = TargetFolder;
+            }
+
+            if (currentReaderState.IsFileOpening)
+            {
+                if (false == currentReaderState.IsFileOpened)
                 {
                     m_pipeReader.WriteFrapsFileFormat = WriteFrapsFileFormat;
                 }
@@ -251,8 +268,7 @@ namespace RTSS_time_reader
 
             var gui_action = new Action(() =>
             {
-                UpdateGUIStatus(currentReaderState);
-                m_previousPipeReaderState = currentReaderState;
+                UpdateGUIStatus(currentReaderState, m_previousPipeReaderState);
             });
 
 
@@ -264,12 +280,12 @@ namespace RTSS_time_reader
             {
                 gui_action();
             }
+            m_previousPipeReaderState = currentReaderState;
         }
 
-        private void UpdateGUIStatus(PipeReaderState p_currentReaderState)
+        private void UpdateGUIStatus(PipeReaderState p_currentReaderState, PipeReaderState p_previousPipeReaderState)
         {
-            var clearedFlags = m_previousPipeReaderState & ~p_currentReaderState;
-            var newFlags = p_currentReaderState & ~m_previousPipeReaderState;
+            var clearedFlags = p_previousPipeReaderState.GetClearedFlags(p_previousPipeReaderState);
             /*
 
                         Debug.Print(Environment.NewLine);
@@ -283,22 +299,22 @@ namespace RTSS_time_reader
 
             */
 
-            if (clearedFlags == PipeReaderState.ConnectionAccepted)
+            if (clearedFlags == PipeReaderStateEnum.ConnectionAccepted)
             {
                 m_pipeReader.EnabledWritingFile = chkStartWritingImmediately.Checked;
             }
 
-            m_flushFileTimer.Enabled = m_pipeReader.IsFileOpened;
+            m_flushFileTimer.Enabled = p_currentReaderState.IsFileOpened;
 
             if (p_currentReaderState != PipeReaderState.None && (false == m_previousStateIsError))
             {
-                lblEroor.Visible = lblErrorInfo.Visible = m_pipeReader.IsError;
-                lblErrorInfo.Text = m_pipeReader.IsError ? m_pipeReader.LastException.Message : string.Empty;
+                lblEroor.Visible = lblErrorInfo.Visible = p_currentReaderState.IsError;
+                lblErrorInfo.Text = p_currentReaderState.IsError ? m_pipeReader.LastException.Message : string.Empty;
             }
 
-            m_previousStateIsError = m_pipeReader.IsError;
+            m_previousStateIsError = p_currentReaderState.IsError;
 
-            if (m_pipeReader.IsConnectionAccepted)
+            if (p_currentReaderState.IsConnectionAccepted)
             {
                 if (m_pipeReader.EnabledWritingFile)
                 {
@@ -322,7 +338,7 @@ namespace RTSS_time_reader
                 }
             }
 
-            if ((false == chkStopOnTimer.Enabled) && (false == m_pipeReader.IsFileOpened))
+            if ((false == chkStopOnTimer.Enabled) && (false == p_currentReaderState.IsFileOpened))
             {
                 chkStopOnTimer.Enabled = true;
                 timePicker.Enabled = true;
@@ -330,10 +346,10 @@ namespace RTSS_time_reader
             }
 
 
-            lblConnected.Visible = lblConnectionInfo.Visible = m_pipeReader.IsPipeCreated;
-            if (m_pipeReader.IsPipeCreated)
+            lblConnected.Visible = lblConnectionInfo.Visible = p_currentReaderState.IsPipeCreated;
+            if (p_currentReaderState.IsPipeCreated)
             {
-                if (false == m_pipeReader.IsConnectionAccepted)
+                if (false == p_currentReaderState.IsConnectionAccepted)
                 {
                     lblConnected.Text = "Accepting connections\n\rto pipe:";
                     lblConnectionInfo.Text = m_pipeReader.PipeFullName;
@@ -345,8 +361,8 @@ namespace RTSS_time_reader
                 }
             }
 
-            lblFIleName.Visible = lblWritingFile.Visible = m_pipeReader.IsFileOpened;
-            if (m_pipeReader.IsFileOpened)
+            lblFIleName.Visible = lblWritingFile.Visible = p_currentReaderState.IsFileOpened;
+            if (p_currentReaderState.IsFileOpened)
             {
                 lblFIleName.Text = m_pipeReader.OpenedFileName;
                 if (false == m_pipeReader.EnabledWritingFile)
@@ -363,20 +379,20 @@ namespace RTSS_time_reader
 
             chkFrapsFormat.Enabled =
                 txtFolder.Enabled =
-                    btnSelectFolder.Enabled = (false == m_pipeReader.IsFileOpened);
+                    btnSelectFolder.Enabled = (false == p_currentReaderState.IsFileOpened);
 
 
             btnStopStart.Enabled = true;
 
-            txtPipeName.Enabled = (false == m_pipeReader.IsStarted);
+            txtPipeName.Enabled = (false == p_currentReaderState.IsStarted);
 
-            if (m_pipeReader.IsStarted)
+            if (p_currentReaderState.IsStarted)
             {
-                if (m_pipeReader.IsConnectionAccepted)
+                if (p_currentReaderState.IsConnectionAccepted)
                 {
                     btnStopStart.Text = "Close connection";
                 }
-                else if (m_pipeReader.IsPipeCreated)
+                else if (p_currentReaderState.IsPipeCreated)
                 {
                     btnStopStart.Text = "Stop listening";
                 }
@@ -420,7 +436,7 @@ namespace RTSS_time_reader
 
         private void StartAndStopWritingFile()
         {
-            if (m_pipeReader.EnabledWritingFile && m_pipeReader.IsConnectionAccepted)
+            if (m_pipeReader.EnabledWritingFile && m_pipeReader.State.IsConnectionAccepted)
             {
                 m_pipeReader.StopWritingFile();
             }
@@ -433,6 +449,12 @@ namespace RTSS_time_reader
         private void chkFrapsFormat_CheckedChanged(object sender, EventArgs e)
         {
             WriteFrapsFileFormat = chkFrapsFormat.Checked;
+        }
+
+        private void txtFolder_TextChanged(object sender, EventArgs e)
+        {
+            StartFileName = Path.Combine("RTSS_Values.txt");
+            TargetFolder = txtFolder.Text;
         }
     }
 }
