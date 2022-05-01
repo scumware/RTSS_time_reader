@@ -16,5 +16,5 @@ It is small lightweight utility intended for reading frametimes provided by Riva
 4. Press hotkey to start or stop writing captured times.
 
 # Special thanks to
-Алексей Николайчук also known as Unwinder for help and special interface with new pipe \\\\.\\PIPE\\RTSS_FrametimeV2
+Алексей Николайчук aka Unwinder for help and special interface with new pipe \\\\.\\PIPE\\RTSS_FrametimeV2
 But currently i'm not using it.
