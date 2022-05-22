@@ -28,7 +28,7 @@ namespace RTSS_time_reader
         private Hotkey? m_registredHotkey;
         private OSD m_OSD;
         private OSDSlot m_osdSlotTop;
-        private OSDSlot m_osdSlotBottom;
+        private OSDSlot m_osdSlotFile;
         private OSDSlot m_osdSlotBottomCPU;
 
 
@@ -210,7 +210,7 @@ namespace RTSS_time_reader
                 if (Disposing || IsDisposed)
                     return;
 
-                m_OSD.Update(m_osdSlotBottom, m_pipeReader.OpenedFileName);
+                m_OSD.Update(m_osdSlotFile, m_pipeReader.OpenedFileName);
                 m_OSD.Update(m_osdSlotTop, osdTextBottom);
                 m_OSD.Update(m_osdSlotBottomCPU, osdCPU);
             }
@@ -228,15 +228,15 @@ namespace RTSS_time_reader
                     var osdSlots = m_OSD.FindOsdSlots();
                     if (osdSlots.Count > 0)
                     {
-                        m_osdSlotTop = osdSlots[0];
-                        m_osdSlotBottom = osdSlots[1];
+                        m_osdSlotFile = osdSlots[0];
+                        m_osdSlotTop = osdSlots[1];
                         m_osdSlotBottomCPU = osdSlots[2];
                     }
                     else
                     {
                         var grabOSDSlots = m_OSD.GrabOSDSlots(3);
-                        m_osdSlotTop = grabOSDSlots[0];
-                        m_osdSlotBottom = grabOSDSlots[1];
+                        m_osdSlotFile = grabOSDSlots[0];
+                        m_osdSlotTop = grabOSDSlots[1];
                         m_osdSlotBottomCPU = grabOSDSlots[2];
                     }
                 }
