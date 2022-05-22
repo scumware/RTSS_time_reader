@@ -1,23 +1,44 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Forms;
-using Timer = System.Timers.Timer;
 
 namespace RTSS_time_reader
 {
+    using RTSS_time_reader.RTSS_interop;
+    using RTSS_time_reader.WindowsInterop;
+    using Timer = System.Timers.Timer;
+
     public partial class MainForm : Form
     {
-
-        private TaskScheduler m_uiScheduler;
         private readonly PipeReader m_pipeReader;
         private readonly Timer m_stopWritingTimer;
-        private readonly System.Timers.Timer m_flushFileTimer;
+        private readonly Timer m_flushFileTimer;
+
+
+        private PipeReaderState m_previousPipeReaderState;
+        private bool m_lblWritingFileVisible;
+        private Hotkey? m_registredHotkey;
+        private OSD m_OSD;
+        private OSDSlot m_osdSlotTop;
+        private OSDSlot m_osdSlotBottom;
+        private OSDSlot m_osdSlotBottomCPU;
+
+
+        private bool m_previousStateIsError = false;
+        private TimeSpan m_remainedTimeSpan;
+        private TimeSpan m_flushTimerPeriod;
+
+        private double m_previousOwnCPUTotal = 0.0;
+        private double m_previousConnectedCPUTotal = 0.0;
+
 
         private ushort? m_globalHotkeyAtom;
 
@@ -50,15 +71,9 @@ namespace RTSS_time_reader
             private set;
         }
 
-        private bool m_previousStateIsError = false;
-        private TimeSpan m_remainedTimeSpan;
-        private TimeSpan m_flushTimerPeriod;
-
         public MainForm()
         {
             InitializeComponent();
-
-            m_uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
 
             var newAtom = Win32A.GlobalAddAtom("RTSS_time_reader");
             if (newAtom != 0)
@@ -66,15 +81,18 @@ namespace RTSS_time_reader
                 m_globalHotkeyAtom = newAtom;
             }
 
-            m_flushTimerPeriod = new TimeSpan(0, 0, 1);
+            m_OSD = new OSD("RTSS_time_reader");
+
+            m_flushTimerPeriod = new TimeSpan(0, 0, 0, 1, 000);
             WriteFrapsFileFormat = chkFrapsFormat.Checked;
 
-            m_flushFileTimer = new System.Timers.Timer();
+            m_flushFileTimer = new Timer();
             m_flushFileTimer.AutoReset = true;
             m_flushFileTimer.Interval = m_flushTimerPeriod.TotalMilliseconds;
             m_flushFileTimer.Elapsed += OnFlushFileTimerElapsed;
+            m_flushFileTimer.Enabled = true;
 
-            m_stopWritingTimer = new System.Timers.Timer();
+            m_stopWritingTimer = new Timer();
             m_stopWritingTimer.AutoReset = false;
             m_stopWritingTimer.Elapsed += StopWritingFileOnTimer;
 
@@ -84,6 +102,30 @@ namespace RTSS_time_reader
             m_pipeReader.StateChanged += (p_sender, p_args) => UpdateStatus();
         }
 
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                m_flushFileTimer.Stop();
+
+                if (components != null)
+                {
+                    components.Dispose();
+                }
+                lock (m_OSD)
+                {
+                    m_OSD.Dispose();
+                }
+            }
+
+            base.Dispose(disposing);
+        }
+
+
         private void StopWritingFileOnTimer(object p_sender, ElapsedEventArgs p_elapsedEventArgs)
         {
             m_pipeReader.StopWritingFile();
@@ -91,22 +133,116 @@ namespace RTSS_time_reader
 
         private void OnFlushFileTimerElapsed(object p_sender, ElapsedEventArgs p_elapsedEventArgs)
         {
-            if (m_pipeReader != null && m_pipeReader.State.IsConnectionAccepted && m_pipeReader.EnabledWritingFile)
+            m_flushFileTimer.Enabled = false;
+            try
             {
-                m_pipeReader.FlushFileBuffer();
-                Action action = () =>
+                if (m_pipeReader == null || !m_pipeReader.State.IsConnectionAccepted)
                 {
-                    m_remainedTimeSpan -= m_flushTimerPeriod;
-                    lblRemained.Text = "remainded: " + m_remainedTimeSpan.ToString("c");
+                    return;
+                }
 
-                    m_lblWritingFileVisible = !m_lblWritingFileVisible;
-                    lblWritingFile.ForeColor = m_lblWritingFileVisible ?
-                        Color.OrangeRed
-                        :
-                        this.BackColor;
-                };
-                Invoke(action);
+
+                if (m_pipeReader.State.IsFileOpened)
+                {
+                    UpdateOSD();
+
+                    if (m_pipeReader.EnabledWritingFile)
+                    {
+                        UpdateGuiOnTimer();
+                    }
+                }
             }
+            finally
+            {
+                m_flushFileTimer.Enabled = true;
+            }
+        }
+
+        private void UpdateGuiOnTimer()
+        {
+            m_pipeReader.FlushFileBuffer();
+
+            Action action = () =>
+            {
+                if (IsDisposed || Disposing)
+                    return;
+
+                m_remainedTimeSpan -= m_flushTimerPeriod;
+                lblRemained.Text = "remainded: " + m_remainedTimeSpan.ToString("c");
+
+                m_lblWritingFileVisible = !m_lblWritingFileVisible;
+                lblWritingFile.ForeColor = m_lblWritingFileVisible
+                    ? Color.OrangeRed
+                    : this.BackColor;
+            };
+            Invoke(action);
+        }
+
+        private void UpdateOSD()
+        {
+            string osdAuxialInfo = m_pipeReader.WriteFrapsFileFormat ? ", FRAPS format" : ", with CPU times";
+            var osdTextBottom = string.Format("recorded {0} frames{1}", m_pipeReader.RecordedFrameTimes, osdAuxialInfo);
+            string osdCPU = "Process not connected";
+
+            if (EnsureOSDSlotsClaimed())
+                return;
+
+            var connectedProcess = m_pipeReader.ConnectedProcess;
+            if (connectedProcess != null)
+            {
+                var currentProcess = Process.GetCurrentProcess();
+
+                var ownCpuTotalCurrentValue = currentProcess.TotalProcessorTime.TotalMilliseconds;
+                var connectedCpuTotalCurrentValue = connectedProcess.TotalProcessorTime.TotalMilliseconds;
+
+                var usedByCurrentProcess = ownCpuTotalCurrentValue - m_previousOwnCPUTotal;
+                m_previousOwnCPUTotal = ownCpuTotalCurrentValue;
+
+                var usedByConnectedProcess = connectedCpuTotalCurrentValue - m_previousConnectedCPUTotal;
+                m_previousConnectedCPUTotal = connectedCpuTotalCurrentValue;
+
+                var percent = usedByCurrentProcess / (usedByConnectedProcess + usedByCurrentProcess + double.Epsilon);
+                osdCPU = string.Format("TotalCPU={0:hh\\:mm\\:ss\\.ff}, time_reader={1:P2}", connectedProcess.TotalProcessorTime, percent);
+            }
+
+            lock (m_OSD)
+            {
+                if (Disposing || IsDisposed)
+                    return;
+
+                m_OSD.Update(m_osdSlotBottom, m_pipeReader.OpenedFileName);
+                m_OSD.Update(m_osdSlotTop, osdTextBottom);
+                m_OSD.Update(m_osdSlotBottomCPU, osdCPU);
+            }
+        }
+
+        private bool EnsureOSDSlotsClaimed()
+        {
+            if (m_osdSlotTop == null)
+            {
+                lock (m_OSD)
+                {
+                    if (Disposing || IsDisposed)
+                        return true;
+
+                    var osdSlots = m_OSD.FindOsdSlots();
+                    if (osdSlots.Count > 0)
+                    {
+                        m_osdSlotTop = osdSlots[0];
+                        m_osdSlotBottom = osdSlots[1];
+                        m_osdSlotBottomCPU = osdSlots[2];
+                    }
+                    else
+                    {
+                        var grabOSDSlots = m_OSD.GrabOSDSlots(3);
+                        m_osdSlotTop = grabOSDSlots[0];
+                        m_osdSlotBottom = grabOSDSlots[1];
+                        m_osdSlotBottomCPU = grabOSDSlots[2];
+                    }
+                }
+            }
+
+            return false;
         }
 
         protected override void OnShown(EventArgs e)
@@ -244,10 +380,6 @@ namespace RTSS_time_reader
             m_pipeReader.EnabledWritingFile = chkStartWritingImmediately.Checked;
         }
 
-        private PipeReaderState m_previousPipeReaderState;
-        private bool m_lblWritingFileVisible;
-        private Hotkey? m_registredHotkey;
-
         public void UpdateStatus()
         {
             var currentReaderState = m_pipeReader.State;
@@ -303,8 +435,6 @@ namespace RTSS_time_reader
             {
                 m_pipeReader.EnabledWritingFile = chkStartWritingImmediately.Checked;
             }
-
-            m_flushFileTimer.Enabled = p_currentReaderState.IsFileOpened;
 
             if (p_currentReaderState != PipeReaderState.None && (false == m_previousStateIsError))
             {
