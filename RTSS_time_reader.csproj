@@ -23,6 +23,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -64,8 +65,17 @@
     <Compile Include="FRAMETIME_PIPE_DATA.cs" />
     <Compile Include="PipeReader.cs" />
     <Compile Include="PipeReaderStateEnum.cs" />
+    <Compile Include="RTSS_interop\AppEntry.cs" />
+    <Compile Include="RTSS_interop\AppFlags.cs" />
+    <Compile Include="RTSS_interop\OSD.cs" />
+    <Compile Include="RTSS_interop\OSDEntry.cs" />
+    <Compile Include="RTSS_interop\OSDSlot.cs" />
+    <Compile Include="RTSS_interop\RTSSSharedMemory.cs" />
+    <Compile Include="RTSS_interop\VideoCaptureFlags.cs" />
+    <Compile Include="RTSS_interop\VIDEO_CAPTURE_PARAM.cs" />
     <Compile Include="StringExtention.cs" />
-    <Compile Include="Win32A.cs" />
+    <Compile Include="WindowsInterop\ByteUtils.cs" />
+    <Compile Include="WindowsInterop\Win32A.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="HotkeyEditorDialog.resx">
@@ -96,5 +106,6 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Diagnostics;
 using System.Windows.Forms;
+using RTSS_time_reader.RTSS_interop;
 
 namespace RTSS_time_reader
 {
@@ -14,9 +13,29 @@ namespace RTSS_time_reader
         [STAThread]
         static void Main()
         {
+#if DEBUG
+                        var osd = new OSD("debug && test");
+                        var exitingOSDEntries = osd.GetExitingOSDEntries();
+                        foreach (var exitingOSDEntry in exitingOSDEntries)
+                        {
+                            Debug.WriteLine($"owner={exitingOSDEntry.Owner}\ttext={exitingOSDEntry.Text}");
+                        }
+                        Debug.WriteLine("");
+
+                        var appEntries = osd.GetAppEntries();
+                        foreach (var appEntry in appEntries)
+                        {
+                            Debug.WriteLine($"{appEntry.Name}\t{appEntry.Flags}");
+                        }
+
+                        Debugger.Break();
+#endif
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+
+            var mainForm = new MainForm();
+            Application.Run(mainForm);
         }
     }
 }

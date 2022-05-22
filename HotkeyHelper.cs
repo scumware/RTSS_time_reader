@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Windows.Forms;
+using RTSS_time_reader.WindowsInterop;
 
 namespace RTSS_time_reader
 {

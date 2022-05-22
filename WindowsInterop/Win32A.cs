@@ -1,13 +1,22 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Text;
+// ReSharper disable InconsistentNaming
+// ReSharper disable IdentifierTypo
 
-namespace RTSS_time_reader
+namespace RTSS_time_reader.WindowsInterop
 {
+    using HANDLE = System.IntPtr;
+    using DWORD = System.UInt32;
+    using SIZE_T = System.UInt64;
+
     [SuppressMessage("ReSharper", "InconsistentNaming")]
     public static class Win32A
     {
+        public const int MAX_PATH = 260;
+
         public const int ERROR_SUCCESS = 0;
         public const uint INVALID_HANDLE_VALUE = unchecked((uint) -1);
         public static unsafe IntPtr INVALID_HANDLE_PTR;
@@ -30,8 +39,16 @@ namespace RTSS_time_reader
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr OpenThread(uint desiredAccess, bool inheritHandle, uint threadId);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool CloseHandle(IntPtr handle);
+        [DllImport("kernel32.dll", SetLastError = true, EntryPoint = "CloseHandle")]
+        public static extern bool CloseHandleInternal(HANDLE handle);
+
+        public static void CloseHandle(HANDLE handle)
+        {
+            var closed = CloseHandleInternal(handle);
+            if (!closed)
+                ThrowLastWin32Error();
+        }
+
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
         public static extern bool CancelSynchronousIo(IntPtr hThread);
@@ -47,8 +64,8 @@ namespace RTSS_time_reader
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
         private static extern IntPtr CreateNamedPipeA(string lpName,
-            uint dwOpenMode,
-            uint dwPipeMode,
+            DWORD dwOpenMode,
+            DWORD dwPipeMode,
             uint nMaxInstances,
             uint nOutBufferSize,
             uint nInBufferSize,
@@ -141,5 +158,76 @@ namespace RTSS_time_reader
         [DllImport("user32.dll", SetLastError = true, ExactSpelling = true)]
         public static extern int GetKeyNameText(int lParam, [Out] StringBuilder lpString,
             int nSize);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern IntPtr OpenFileMapping(DWORD dwDesiredAccess, bool bInheritHandle,
+            string lpName);
+
+
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr MapViewOfFileEx(
+            [In] IntPtr hFileMappingObject,
+            [In] FileMapAccessType dwDesiredAccess,
+            [In] DWORD dwFileOffsetHigh,
+            [In] DWORD dwFileOffsetLow,
+            [In] DWORD dwNumberOfBytesToMap,
+            [In, Optional] IntPtr lpBaseAddress);
+
+        [DllImport("kernel32.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern IntPtr MapViewOfFile(
+            [In] HANDLE hFileMappingObject,
+            [In] DWORD dwDesiredAccess,
+            [In] DWORD dwFileOffsetHigh,
+            [In] DWORD dwFileOffsetLow,
+            [In] DWORD dwNumberOfBytesToMap
+        );
+
+        [DllImport("kernel32.dll")]
+        public static extern bool UnmapViewOfFile([In] IntPtr lpBaseAddress);
+
+        [DllImport("Kernel32.dll", EntryPoint = "RtlZeroMemory", SetLastError = false)]
+        public static extern void ZeroMemory(IntPtr dest, DWORD size);
+
+        public static void ThrowLastWin32Error()
+        {
+            var win32Error = Marshal.GetLastWin32Error();
+            if (win32Error != Win32A.ERROR_SUCCESS)
+            {
+                throw new Win32Exception(win32Error);
+            }
+        }
+    }
+
+
+    [Flags]
+    public enum FileMapAccessType : uint
+    {
+        Copy = 0x01,
+        Write = 0x02,
+        Read = 0x04,
+        AllAccess = 0x08,
+        Execute = 0x20,
+    }
+
+    [Flags]
+    public enum SectionFlags :DWORD
+    {
+        STANDARD_RIGHTS_REQUIRED    = 0x000F0000,
+        SECTION_QUERY               = 0x0001,
+        SECTION_MAP_WRITE           = 0x0002,
+        SECTION_MAP_READ            = 0x0004,
+        SECTION_MAP_EXECUTE         = 0x0008,
+        SECTION_EXTEND_SIZE         = 0x0010,
+        SECTION_ALL_ACCESS = (STANDARD_RIGHTS_REQUIRED | SECTION_QUERY |
+                SECTION_MAP_WRITE |
+                SECTION_MAP_READ |
+                SECTION_MAP_EXECUTE |
+                SECTION_EXTEND_SIZE)
+    }
+
+    [Flags]
+    public enum FileMapFlags : DWORD
+    {
+        FILE_MAP_ALL_ACCESS = SectionFlags.SECTION_ALL_ACCESS
     }
 }

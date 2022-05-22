@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
+using RTSS_time_reader.WindowsInterop;
 
 namespace RTSS_time_reader
 {
@@ -37,6 +38,7 @@ namespace RTSS_time_reader
         private volatile bool m_continueAcceptingConnections;
         private Process m_connectedProcess;
         public string ProcessName { get; private set; }
+        private volatile uint m_recordedFrameTimes;
 
         public PipeReader()
         {
@@ -332,6 +334,8 @@ namespace RTSS_time_reader
             uint totalTime = 0;
             var firstPass = true;
             var totalTimeSb = new StringBuilder(valueStringLenght);
+            var valuesLineStringBuilder = new StringBuilder();
+
 
             int bufferSize;
             unsafe
@@ -384,8 +388,7 @@ namespace RTSS_time_reader
 
                                     if (false == m_writeFrapsFileFormat)
                                     {
-                                        var valuesLineStringBuilder = new StringBuilder();
-
+                                        valuesLineStringBuilder.Clear();
                                         if (false == firstPass)
                                         {
                                             valuesLineStringBuilder.AppendLine();
@@ -432,7 +435,10 @@ namespace RTSS_time_reader
                                     lock (m_fileStreamLocker)
                                     {
                                         if (m_fileStream != null)
+                                        {
                                             m_fileStream.Write(stringBytes, 0, stringBytes.Length);
+                                            m_recordedFrameTimes = frameNumber;
+                                        }
                                         else
                                         {
                                             OpenFile();
@@ -509,6 +515,13 @@ namespace RTSS_time_reader
             get { return m_continueAcceptingConnections; }
             set { m_continueAcceptingConnections = value; }
         }
+
+        public uint RecordedFrameTimes
+        {
+            get { return m_recordedFrameTimes; }
+        }
+
+        public Process ConnectedProcess => m_connectedProcess;
 
         private void WriteFileHeader()
         {
